@@ -184,7 +184,6 @@ impl Default for StatementCache {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::Oid;
 
     fn make_stmt(sql: &str) -> Statement {
         Statement::new(String::new(), sql.to_string(), vec![], None)
