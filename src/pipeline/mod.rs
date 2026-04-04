@@ -7,7 +7,7 @@ use bytes::BytesMut;
 use crate::error::{Error, Result};
 use crate::protocol::backend::BackendMessage;
 use crate::protocol::frontend;
-use crate::row::{CommandResult, Row, RowDescription, parse_command_tag};
+use crate::row::{parse_command_tag, CommandResult, Row, RowDescription};
 
 /// A single query in a pipeline with its bound parameters.
 #[derive(Debug)]
@@ -59,11 +59,7 @@ pub(crate) fn encode_pipeline(buf: &mut BytesMut, queries: &[PipelineQuery]) {
         frontend::parse(buf, "", &q.sql, &oids);
 
         // Bind with unnamed portal and statement
-        let param_refs: Vec<Option<&[u8]>> = q
-            .params
-            .iter()
-            .map(|p| p.as_deref())
-            .collect();
+        let param_refs: Vec<Option<&[u8]>> = q.params.iter().map(|p| p.as_deref()).collect();
         frontend::bind(buf, "", "", &param_refs, &[]);
 
         // Describe portal to get RowDescription (if SELECT)
@@ -169,9 +165,9 @@ async fn read_query_result(
         let msg = conn.recv().await?;
         match msg {
             BackendMessage::DataRow { columns } => {
-                let desc = description.as_ref().ok_or_else(|| {
-                    Error::protocol("received DataRow without RowDescription")
-                })?;
+                let desc = description
+                    .as_ref()
+                    .ok_or_else(|| Error::protocol("received DataRow without RowDescription"))?;
                 rows.push(Row::new(columns, Arc::clone(desc)));
             }
             BackendMessage::CommandComplete { tag } => {
@@ -224,8 +220,6 @@ async fn expect_message(
             fields.position,
         ))
     } else {
-        Err(Error::protocol(format!(
-            "expected {expected}, got {msg:?}"
-        )))
+        Err(Error::protocol(format!("expected {expected}, got {msg:?}")))
     }
 }

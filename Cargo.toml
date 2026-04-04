@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "sentinel-driver-derive"]
+members = [".", "derive"]
 
 [package]
 name = "sentinel-driver"
@@ -43,7 +43,7 @@ tracing = "0.1"
 lru = "0.12"
 
 # Derive macros
-sentinel-driver-derive = { path = "sentinel-driver-derive", optional = true }
+sentinel-driver-derive = { path = "derive", optional = true }
 
 [features]
 default = ["derive"]

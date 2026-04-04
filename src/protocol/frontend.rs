@@ -221,7 +221,12 @@ mod tests {
     #[test]
     fn test_startup_message() {
         let mut buf = BytesMut::new();
-        startup(&mut buf, "testuser", "testdb", &[("application_name", "sentinel")]);
+        startup(
+            &mut buf,
+            "testuser",
+            "testdb",
+            &[("application_name", "sentinel")],
+        );
 
         let len = i32::from_be_bytes(buf[0..4].try_into().unwrap());
         assert_eq!(len as usize, buf.len());

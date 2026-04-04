@@ -103,11 +103,7 @@ pub(crate) async fn unlisten_all(conn: &mut PgConnection) -> Result<()> {
 }
 
 /// Send a notification on a channel.
-pub(crate) async fn notify(
-    conn: &mut PgConnection,
-    channel: &str,
-    payload: &str,
-) -> Result<()> {
+pub(crate) async fn notify(conn: &mut PgConnection, channel: &str, payload: &str) -> Result<()> {
     validate_channel_name(channel)?;
 
     // Use pg_notify() function to safely pass the payload as a parameter
@@ -170,8 +166,9 @@ pub(crate) async fn wait_for_notification(conn: &mut PgConnection) -> Result<Not
                 ));
             }
             // Silently consume keepalive/status messages
-            BackendMessage::ParameterStatus { .. }
-            | BackendMessage::NoticeResponse { .. } => continue,
+            BackendMessage::ParameterStatus { .. } | BackendMessage::NoticeResponse { .. } => {
+                continue
+            }
             _ => continue,
         }
     }

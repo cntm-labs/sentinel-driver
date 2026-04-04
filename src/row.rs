@@ -77,9 +77,8 @@ impl Row {
     /// Panics if the column index is out of bounds or the value cannot be decoded.
     /// Use [`try_get`](Self::try_get) for a non-panicking version.
     pub fn get<T: FromSql>(&self, idx: usize) -> T {
-        self.try_get(idx).unwrap_or_else(|e| {
-            panic!("error getting column {idx}: {e}")
-        })
+        self.try_get(idx)
+            .unwrap_or_else(|e| panic!("error getting column {idx}: {e}"))
     }
 
     /// Get a typed column value by name.
@@ -88,9 +87,8 @@ impl Row {
     ///
     /// Panics if the column name doesn't exist or the value cannot be decoded.
     pub fn get_by_name<T: FromSql>(&self, name: &str) -> T {
-        self.try_get_by_name(name).unwrap_or_else(|e| {
-            panic!("error getting column '{name}': {e}")
-        })
+        self.try_get_by_name(name)
+            .unwrap_or_else(|e| panic!("error getting column '{name}': {e}"))
     }
 
     /// Try to get a typed column value by index.

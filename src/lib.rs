@@ -51,17 +51,17 @@ pub mod types;
 
 // ── Public re-exports ────────────────────────────────
 
+pub use cache::{CacheMetrics, StatementCache};
 pub use config::{Config, SslMode};
+pub use copy::binary::{BinaryCopyDecoder, BinaryCopyEncoder};
+pub use copy::text::{TextCopyDecoder, TextCopyEncoder};
 pub use error::{Error, Result};
+pub use notify::Notification;
+pub use pool::Pool;
 pub use row::{CommandResult, Row, RowDescription};
 pub use statement::Statement;
 pub use transaction::{IsolationLevel, TransactionConfig};
 pub use types::{FromSql, Oid, ToSql};
-pub use pool::Pool;
-pub use cache::{CacheMetrics, StatementCache};
-pub use notify::Notification;
-pub use copy::binary::{BinaryCopyEncoder, BinaryCopyDecoder};
-pub use copy::text::{TextCopyEncoder, TextCopyDecoder};
 
 // Re-export derive macros when the `derive` feature is enabled
 #[cfg(feature = "derive")]
@@ -69,8 +69,8 @@ pub use sentinel_driver_derive::{FromRow, FromSql, ToSql};
 
 use bytes::BytesMut;
 
-use crate::connection::stream::PgConnection;
 use crate::connection::startup::{self};
+use crate::connection::stream::PgConnection;
 use crate::pipeline::batch::PipelineBatch;
 use crate::protocol::backend::{BackendMessage, TransactionStatus};
 use crate::protocol::frontend;
@@ -114,11 +114,7 @@ impl Connection {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn query(
-        &mut self,
-        sql: &str,
-        params: &[&(dyn ToSql + Sync)],
-    ) -> Result<Vec<Row>> {
+    pub async fn query(&mut self, sql: &str, params: &[&(dyn ToSql + Sync)]) -> Result<Vec<Row>> {
         let result = self.query_internal(sql, params).await?;
         match result {
             pipeline::QueryResult::Rows(rows) => Ok(rows),
@@ -129,11 +125,7 @@ impl Connection {
     /// Execute a query that returns a single row.
     ///
     /// Returns an error if no rows are returned.
-    pub async fn query_one(
-        &mut self,
-        sql: &str,
-        params: &[&(dyn ToSql + Sync)],
-    ) -> Result<Row> {
+    pub async fn query_one(&mut self, sql: &str, params: &[&(dyn ToSql + Sync)]) -> Result<Row> {
         let rows = self.query(sql, params).await?;
         rows.into_iter()
             .next()
@@ -153,11 +145,7 @@ impl Connection {
     /// Execute a non-SELECT query (INSERT, UPDATE, DELETE, etc.).
     ///
     /// Returns the number of rows affected.
-    pub async fn execute(
-        &mut self,
-        sql: &str,
-        params: &[&(dyn ToSql + Sync)],
-    ) -> Result<u64> {
+    pub async fn execute(&mut self, sql: &str, params: &[&(dyn ToSql + Sync)]) -> Result<u64> {
         let result = self.query_internal(sql, params).await?;
         match result {
             pipeline::QueryResult::Command(r) => Ok(r.rows_affected),
@@ -309,11 +297,19 @@ impl Connection {
             BackendMessage::ErrorResponse { fields } => {
                 self.drain_until_ready().await.ok();
                 return Err(Error::server(
-                    fields.severity, fields.code, fields.message,
-                    fields.detail, fields.hint, fields.position,
+                    fields.severity,
+                    fields.code,
+                    fields.message,
+                    fields.detail,
+                    fields.hint,
+                    fields.position,
                 ));
             }
-            other => return Err(Error::protocol(format!("expected ParseComplete, got {other:?}"))),
+            other => {
+                return Err(Error::protocol(format!(
+                    "expected ParseComplete, got {other:?}"
+                )))
+            }
         }
 
         // ParameterDescription
@@ -321,26 +317,38 @@ impl Connection {
             BackendMessage::ParameterDescription { oids } => {
                 oids.into_iter().map(Oid::from).collect()
             }
-            other => return Err(Error::protocol(format!("expected ParameterDescription, got {other:?}"))),
+            other => {
+                return Err(Error::protocol(format!(
+                    "expected ParameterDescription, got {other:?}"
+                )))
+            }
         };
 
         // RowDescription or NoData
         let columns = match self.conn.recv().await? {
             BackendMessage::RowDescription { fields } => Some(fields),
             BackendMessage::NoData => None,
-            other => return Err(Error::protocol(format!("expected RowDescription/NoData, got {other:?}"))),
+            other => {
+                return Err(Error::protocol(format!(
+                    "expected RowDescription/NoData, got {other:?}"
+                )))
+            }
         };
 
         // ReadyForQuery
         self.drain_until_ready().await?;
 
-        Ok(Statement::new(stmt_name, sql.to_string(), param_oids, columns))
+        Ok(Statement::new(
+            stmt_name,
+            sql.to_string(),
+            param_oids,
+            columns,
+        ))
     }
 
     /// Register a prepared statement in the Tier 1 cache.
     pub fn register_statement(&mut self, name: &str, statement: Statement) {
-        self.stmt_cache
-            .register(name.to_string(), statement);
+        self.stmt_cache.register(name.to_string(), statement);
     }
 
     /// Get statement cache metrics.

@@ -121,9 +121,7 @@ impl StatementCache {
         // Check if inserting will evict
         let evicted = if self.adhoc.len() == self.adhoc.cap().get() {
             // Peek at the LRU entry that will be evicted
-            self.adhoc
-                .peek_lru()
-                .map(|(_, cached)| cached.name.clone())
+            self.adhoc.peek_lru().map(|(_, cached)| cached.name.clone())
         } else {
             None
         };
@@ -132,13 +130,7 @@ impl StatementCache {
             self.metrics.evictions += 1;
         }
 
-        self.adhoc.put(
-            sql,
-            CachedStatement {
-                name,
-                statement,
-            },
-        );
+        self.adhoc.put(sql, CachedStatement { name, statement });
 
         evicted
     }

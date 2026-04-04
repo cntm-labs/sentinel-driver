@@ -7,7 +7,9 @@ use crate::types::ToSql;
 // ── Primitive types ──────────────────────────────────
 
 impl ToSql for bool {
-    fn oid(&self) -> Oid { Oid::BOOL }
+    fn oid(&self) -> Oid {
+        Oid::BOOL
+    }
 
     fn to_sql(&self, buf: &mut BytesMut) -> Result<()> {
         buf.put_u8(if *self { 1 } else { 0 });
@@ -16,7 +18,9 @@ impl ToSql for bool {
 }
 
 impl ToSql for i16 {
-    fn oid(&self) -> Oid { Oid::INT2 }
+    fn oid(&self) -> Oid {
+        Oid::INT2
+    }
 
     fn to_sql(&self, buf: &mut BytesMut) -> Result<()> {
         buf.put_i16(*self);
@@ -25,7 +29,9 @@ impl ToSql for i16 {
 }
 
 impl ToSql for i32 {
-    fn oid(&self) -> Oid { Oid::INT4 }
+    fn oid(&self) -> Oid {
+        Oid::INT4
+    }
 
     fn to_sql(&self, buf: &mut BytesMut) -> Result<()> {
         buf.put_i32(*self);
@@ -34,7 +40,9 @@ impl ToSql for i32 {
 }
 
 impl ToSql for i64 {
-    fn oid(&self) -> Oid { Oid::INT8 }
+    fn oid(&self) -> Oid {
+        Oid::INT8
+    }
 
     fn to_sql(&self, buf: &mut BytesMut) -> Result<()> {
         buf.put_i64(*self);
@@ -43,7 +51,9 @@ impl ToSql for i64 {
 }
 
 impl ToSql for f32 {
-    fn oid(&self) -> Oid { Oid::FLOAT4 }
+    fn oid(&self) -> Oid {
+        Oid::FLOAT4
+    }
 
     fn to_sql(&self, buf: &mut BytesMut) -> Result<()> {
         buf.put_f32(*self);
@@ -52,7 +62,9 @@ impl ToSql for f32 {
 }
 
 impl ToSql for f64 {
-    fn oid(&self) -> Oid { Oid::FLOAT8 }
+    fn oid(&self) -> Oid {
+        Oid::FLOAT8
+    }
 
     fn to_sql(&self, buf: &mut BytesMut) -> Result<()> {
         buf.put_f64(*self);
@@ -63,7 +75,9 @@ impl ToSql for f64 {
 // ── String types ─────────────────────────────────────
 
 impl ToSql for &str {
-    fn oid(&self) -> Oid { Oid::TEXT }
+    fn oid(&self) -> Oid {
+        Oid::TEXT
+    }
 
     fn to_sql(&self, buf: &mut BytesMut) -> Result<()> {
         buf.put_slice(self.as_bytes());
@@ -72,7 +86,9 @@ impl ToSql for &str {
 }
 
 impl ToSql for String {
-    fn oid(&self) -> Oid { Oid::TEXT }
+    fn oid(&self) -> Oid {
+        Oid::TEXT
+    }
 
     fn to_sql(&self, buf: &mut BytesMut) -> Result<()> {
         buf.put_slice(self.as_bytes());
@@ -83,7 +99,9 @@ impl ToSql for String {
 // ── Byte types ───────────────────────────────────────
 
 impl ToSql for &[u8] {
-    fn oid(&self) -> Oid { Oid::BYTEA }
+    fn oid(&self) -> Oid {
+        Oid::BYTEA
+    }
 
     fn to_sql(&self, buf: &mut BytesMut) -> Result<()> {
         buf.put_slice(self);
@@ -92,7 +110,9 @@ impl ToSql for &[u8] {
 }
 
 impl ToSql for Vec<u8> {
-    fn oid(&self) -> Oid { Oid::BYTEA }
+    fn oid(&self) -> Oid {
+        Oid::BYTEA
+    }
 
     fn to_sql(&self, buf: &mut BytesMut) -> Result<()> {
         buf.put_slice(self);
@@ -107,7 +127,9 @@ impl ToSql for Vec<u8> {
 const PG_EPOCH_OFFSET_US: i64 = 946_684_800_000_000;
 
 impl ToSql for chrono::NaiveDateTime {
-    fn oid(&self) -> Oid { Oid::TIMESTAMP }
+    fn oid(&self) -> Oid {
+        Oid::TIMESTAMP
+    }
 
     fn to_sql(&self, buf: &mut BytesMut) -> Result<()> {
         let us = self.and_utc().timestamp_micros() - PG_EPOCH_OFFSET_US;
@@ -117,7 +139,9 @@ impl ToSql for chrono::NaiveDateTime {
 }
 
 impl ToSql for chrono::DateTime<chrono::Utc> {
-    fn oid(&self) -> Oid { Oid::TIMESTAMPTZ }
+    fn oid(&self) -> Oid {
+        Oid::TIMESTAMPTZ
+    }
 
     fn to_sql(&self, buf: &mut BytesMut) -> Result<()> {
         let us = self.timestamp_micros() - PG_EPOCH_OFFSET_US;
@@ -127,7 +151,9 @@ impl ToSql for chrono::DateTime<chrono::Utc> {
 }
 
 impl ToSql for chrono::NaiveDate {
-    fn oid(&self) -> Oid { Oid::DATE }
+    fn oid(&self) -> Oid {
+        Oid::DATE
+    }
 
     fn to_sql(&self, buf: &mut BytesMut) -> Result<()> {
         let epoch = chrono::NaiveDate::from_ymd_opt(2000, 1, 1).unwrap();
@@ -138,7 +164,9 @@ impl ToSql for chrono::NaiveDate {
 }
 
 impl ToSql for chrono::NaiveTime {
-    fn oid(&self) -> Oid { Oid::TIME }
+    fn oid(&self) -> Oid {
+        Oid::TIME
+    }
 
     fn to_sql(&self, buf: &mut BytesMut) -> Result<()> {
         let us = self
@@ -153,7 +181,9 @@ impl ToSql for chrono::NaiveTime {
 // ── UUID ─────────────────────────────────────────────
 
 impl ToSql for uuid::Uuid {
-    fn oid(&self) -> Oid { Oid::UUID }
+    fn oid(&self) -> Oid {
+        Oid::UUID
+    }
 
     fn to_sql(&self, buf: &mut BytesMut) -> Result<()> {
         buf.put_slice(self.as_bytes());

@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput, Data, Fields, Type};
+use syn::{parse_macro_input, Data, DeriveInput, Fields, Type};
 
 /// Derive `FromRow` for a struct — automatically decode a `Row` into the struct.
 ///

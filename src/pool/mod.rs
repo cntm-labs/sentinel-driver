@@ -8,8 +8,8 @@ use tokio::sync::{Mutex, Semaphore};
 use tracing::debug;
 
 use crate::config::Config;
-use crate::connection::stream::PgConnection;
 use crate::connection::startup;
+use crate::connection::stream::PgConnection;
 use crate::error::{Error, Result};
 use crate::pool::config::PoolConfig;
 use crate::pool::health::ConnectionMeta;
@@ -206,7 +206,6 @@ impl PooledConnection {
     }
 }
 
-
 impl Drop for PooledConnection {
     fn drop(&mut self) {
         if let Some(conn) = self.conn.take() {
@@ -240,9 +239,7 @@ mod tests {
 
     #[test]
     fn test_pool_config_creation() {
-        let config = PoolConfig::new()
-            .max_connections(10)
-            .min_connections(2);
+        let config = PoolConfig::new().max_connections(10).min_connections(2);
 
         assert_eq!(config.max_connections, 10);
         assert_eq!(config.min_connections, 2);

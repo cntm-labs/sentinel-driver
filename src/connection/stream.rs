@@ -2,14 +2,14 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use bytes::BytesMut;
-use tokio::io::{self, AsyncRead, AsyncWrite, AsyncReadExt, AsyncWriteExt, ReadBuf};
+use tokio::io::{self, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf};
 use tokio::net::TcpStream;
 use tokio_rustls::client::TlsStream;
 
 use crate::config::{Config, SslMode};
 use crate::error::{Error, Result};
-use crate::protocol::codec;
 use crate::protocol::backend::BackendMessage;
+use crate::protocol::codec;
 use crate::protocol::frontend;
 use crate::tls;
 
@@ -107,9 +107,7 @@ impl PgConnection {
                         match config.ssl_mode() {
                             SslMode::Prefer => PgStream::Tcp(tcp),
                             _ => {
-                                return Err(Error::Tls(
-                                    "server does not support TLS".to_string(),
-                                ));
+                                return Err(Error::Tls("server does not support TLS".to_string()));
                             }
                         }
                     }
@@ -162,7 +160,11 @@ impl PgConnection {
             }
 
             // Need more data from the stream.
-            let n = self.stream.read_buf(&mut self.read_buf).await.map_err(Error::Io)?;
+            let n = self
+                .stream
+                .read_buf(&mut self.read_buf)
+                .await
+                .map_err(Error::Io)?;
             if n == 0 {
                 return Err(Error::ConnectionClosed);
             }

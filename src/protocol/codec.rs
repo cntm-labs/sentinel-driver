@@ -81,10 +81,7 @@ mod tests {
         buf.put_u8(b'I');
 
         let msg = decode_message(&mut buf).unwrap().unwrap();
-        assert!(matches!(
-            msg,
-            BackendMessage::ReadyForQuery { .. }
-        ));
+        assert!(matches!(msg, BackendMessage::ReadyForQuery { .. }));
         assert!(buf.is_empty()); // fully consumed
     }
 

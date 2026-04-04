@@ -80,7 +80,11 @@ impl Config {
         let without_scheme = s
             .strip_prefix("postgres://")
             .or_else(|| s.strip_prefix("postgresql://"))
-            .ok_or_else(|| Error::Config("connection string must start with postgres:// or postgresql://".into()))?;
+            .ok_or_else(|| {
+                Error::Config(
+                    "connection string must start with postgres:// or postgresql://".into(),
+                )
+            })?;
 
         let (userinfo, rest) = match without_scheme.split_once('@') {
             Some((ui, rest)) => (Some(ui), rest),
@@ -89,10 +93,7 @@ impl Config {
 
         let (user, password) = match userinfo {
             Some(ui) => match ui.split_once(':') {
-                Some((u, p)) => (
-                    percent_decode(u)?,
-                    Some(percent_decode(p)?),
-                ),
+                Some((u, p)) => (percent_decode(u)?, Some(percent_decode(p)?)),
                 None => (percent_decode(ui)?, None),
             },
             None => (String::new(), None),
@@ -155,9 +156,9 @@ impl Config {
                         config = config.application_name(value);
                     }
                     "connect_timeout" => {
-                        let secs: u64 = value
-                            .parse()
-                            .map_err(|_| Error::Config(format!("invalid connect_timeout: {value}")))?;
+                        let secs: u64 = value.parse().map_err(|_| {
+                            Error::Config(format!("invalid connect_timeout: {value}"))
+                        })?;
                         config = config.connect_timeout(Duration::from_secs(secs));
                     }
                     "target_session_attrs" => {
@@ -382,10 +383,8 @@ mod tests {
 
     #[test]
     fn parse_connection_string_with_params() {
-        let config = Config::parse(
-            "postgres://u:p@host/db?sslmode=require&application_name=test",
-        )
-        .unwrap();
+        let config =
+            Config::parse("postgres://u:p@host/db?sslmode=require&application_name=test").unwrap();
         assert_eq!(config.ssl_mode(), SslMode::Require);
         assert_eq!(config.application_name(), Some("test"));
     }
@@ -405,10 +404,7 @@ mod tests {
 
     #[test]
     fn builder_defaults() {
-        let config = Config::builder()
-            .user("test")
-            .database("testdb")
-            .build();
+        let config = Config::builder().user("test").database("testdb").build();
         assert_eq!(config.host(), "localhost");
         assert_eq!(config.port(), 5432);
         assert_eq!(config.ssl_mode(), SslMode::Prefer);

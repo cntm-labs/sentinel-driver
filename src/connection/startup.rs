@@ -56,18 +56,18 @@ pub(crate) async fn startup(conn: &mut PgConnection, config: &Config) -> Result<
             }
 
             BackendMessage::AuthenticationCleartextPassword => {
-                let password = config
-                    .password()
-                    .ok_or_else(|| Error::Auth("server requested password but none provided".into()))?;
+                let password = config.password().ok_or_else(|| {
+                    Error::Auth("server requested password but none provided".into())
+                })?;
                 warn!("using cleartext password authentication (insecure)");
                 frontend::password(conn.write_buf(), password);
                 conn.send().await?;
             }
 
             BackendMessage::AuthenticationMd5Password { salt } => {
-                let password = config
-                    .password()
-                    .ok_or_else(|| Error::Auth("server requested password but none provided".into()))?;
+                let password = config.password().ok_or_else(|| {
+                    Error::Auth("server requested password but none provided".into())
+                })?;
                 warn!("using MD5 authentication (deprecated, consider SCRAM-SHA-256)");
                 let hashed = auth::md5::compute_md5(config.user(), password, &salt);
                 frontend::password(conn.write_buf(), &hashed);
@@ -75,9 +75,9 @@ pub(crate) async fn startup(conn: &mut PgConnection, config: &Config) -> Result<
             }
 
             BackendMessage::AuthenticationSasl { mechanisms } => {
-                let password = config
-                    .password()
-                    .ok_or_else(|| Error::Auth("server requested password but none provided".into()))?;
+                let password = config.password().ok_or_else(|| {
+                    Error::Auth("server requested password but none provided".into())
+                })?;
 
                 auth::scram::authenticate(conn, password, &mechanisms).await?;
             }

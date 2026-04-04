@@ -84,7 +84,11 @@ pub struct ServerError {
 
 impl fmt::Display for ServerError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}: {} (SQLSTATE {})", self.severity, self.message, self.code)
+        write!(
+            f,
+            "{}: {} (SQLSTATE {})",
+            self.severity, self.message, self.code
+        )
     }
 }
 
@@ -117,10 +121,7 @@ impl Error {
 
     /// Returns `true` if the connection should be considered broken.
     pub fn is_fatal(&self) -> bool {
-        matches!(
-            self,
-            Error::Io(_) | Error::ConnectionClosed | Error::Tls(_)
-        )
+        matches!(self, Error::Io(_) | Error::ConnectionClosed | Error::Tls(_))
     }
 }
 

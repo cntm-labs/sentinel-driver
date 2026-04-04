@@ -113,8 +113,7 @@ mod tests {
 
     #[test]
     fn test_begin_serializable() {
-        let config = TransactionConfig::new()
-            .isolation(IsolationLevel::Serializable);
+        let config = TransactionConfig::new().isolation(IsolationLevel::Serializable);
         assert_eq!(config.begin_sql(), "BEGIN ISOLATION LEVEL SERIALIZABLE");
     }
 

@@ -171,7 +171,11 @@ mod tests {
     #[test]
     fn test_encode_escape_special_chars() {
         let mut encoder = TextCopyEncoder::new();
-        encoder.add_row(&[Some("line1\nline2"), Some("col1\tcol2"), Some("back\\slash")]);
+        encoder.add_row(&[
+            Some("line1\nline2"),
+            Some("col1\tcol2"),
+            Some("back\\slash"),
+        ]);
         let data = String::from_utf8(encoder.finish()).unwrap();
         assert_eq!(data, "line1\\nline2\tcol1\\tcol2\tback\\\\slash\n");
     }
@@ -179,7 +183,10 @@ mod tests {
     #[test]
     fn test_decode_simple_line() {
         let fields = TextCopyDecoder::parse_line("42\thello").unwrap();
-        assert_eq!(fields, vec![Some("42".to_string()), Some("hello".to_string())]);
+        assert_eq!(
+            fields,
+            vec![Some("42".to_string()), Some("hello".to_string())]
+        );
     }
 
     #[test]
@@ -187,17 +194,14 @@ mod tests {
         let fields = TextCopyDecoder::parse_line("1\t\\N\tthree").unwrap();
         assert_eq!(
             fields,
-            vec![
-                Some("1".to_string()),
-                None,
-                Some("three".to_string()),
-            ]
+            vec![Some("1".to_string()), None, Some("three".to_string()),]
         );
     }
 
     #[test]
     fn test_decode_escaped_chars() {
-        let fields = TextCopyDecoder::parse_line("line1\\nline2\tcol1\\tcol2\tback\\\\slash").unwrap();
+        let fields =
+            TextCopyDecoder::parse_line("line1\\nline2\tcol1\\tcol2\tback\\\\slash").unwrap();
         assert_eq!(
             fields,
             vec![

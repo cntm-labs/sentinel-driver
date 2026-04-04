@@ -1,11 +1,13 @@
 use crate::error::{Error, Result};
-use crate::types::Oid;
 use crate::types::FromSql;
+use crate::types::Oid;
 
 // ── Primitive types ──────────────────────────────────
 
 impl FromSql for bool {
-    fn oid() -> Oid { Oid::BOOL }
+    fn oid() -> Oid {
+        Oid::BOOL
+    }
 
     fn from_sql(buf: &[u8]) -> Result<Self> {
         if buf.len() != 1 {
@@ -19,7 +21,9 @@ impl FromSql for bool {
 }
 
 impl FromSql for i16 {
-    fn oid() -> Oid { Oid::INT2 }
+    fn oid() -> Oid {
+        Oid::INT2
+    }
 
     fn from_sql(buf: &[u8]) -> Result<Self> {
         let arr: [u8; 2] = buf
@@ -30,7 +34,9 @@ impl FromSql for i16 {
 }
 
 impl FromSql for i32 {
-    fn oid() -> Oid { Oid::INT4 }
+    fn oid() -> Oid {
+        Oid::INT4
+    }
 
     fn from_sql(buf: &[u8]) -> Result<Self> {
         let arr: [u8; 4] = buf
@@ -41,7 +47,9 @@ impl FromSql for i32 {
 }
 
 impl FromSql for i64 {
-    fn oid() -> Oid { Oid::INT8 }
+    fn oid() -> Oid {
+        Oid::INT8
+    }
 
     fn from_sql(buf: &[u8]) -> Result<Self> {
         let arr: [u8; 8] = buf
@@ -52,7 +60,9 @@ impl FromSql for i64 {
 }
 
 impl FromSql for f32 {
-    fn oid() -> Oid { Oid::FLOAT4 }
+    fn oid() -> Oid {
+        Oid::FLOAT4
+    }
 
     fn from_sql(buf: &[u8]) -> Result<Self> {
         let arr: [u8; 4] = buf
@@ -63,7 +73,9 @@ impl FromSql for f32 {
 }
 
 impl FromSql for f64 {
-    fn oid() -> Oid { Oid::FLOAT8 }
+    fn oid() -> Oid {
+        Oid::FLOAT8
+    }
 
     fn from_sql(buf: &[u8]) -> Result<Self> {
         let arr: [u8; 8] = buf
@@ -76,7 +88,9 @@ impl FromSql for f64 {
 // ── String types ─────────────────────────────────────
 
 impl FromSql for String {
-    fn oid() -> Oid { Oid::TEXT }
+    fn oid() -> Oid {
+        Oid::TEXT
+    }
 
     fn from_sql(buf: &[u8]) -> Result<Self> {
         String::from_utf8(buf.to_vec())
@@ -87,7 +101,9 @@ impl FromSql for String {
 // ── Byte types ───────────────────────────────────────
 
 impl FromSql for Vec<u8> {
-    fn oid() -> Oid { Oid::BYTEA }
+    fn oid() -> Oid {
+        Oid::BYTEA
+    }
 
     fn from_sql(buf: &[u8]) -> Result<Self> {
         Ok(buf.to_vec())
@@ -100,7 +116,9 @@ impl FromSql for Vec<u8> {
 const PG_EPOCH_OFFSET_US: i64 = 946_684_800_000_000;
 
 impl FromSql for chrono::NaiveDateTime {
-    fn oid() -> Oid { Oid::TIMESTAMP }
+    fn oid() -> Oid {
+        Oid::TIMESTAMP
+    }
 
     fn from_sql(buf: &[u8]) -> Result<Self> {
         let us_from_pg_epoch = i64::from_sql(buf)?;
@@ -114,7 +132,9 @@ impl FromSql for chrono::NaiveDateTime {
 }
 
 impl FromSql for chrono::DateTime<chrono::Utc> {
-    fn oid() -> Oid { Oid::TIMESTAMPTZ }
+    fn oid() -> Oid {
+        Oid::TIMESTAMPTZ
+    }
 
     fn from_sql(buf: &[u8]) -> Result<Self> {
         let us_from_pg_epoch = i64::from_sql(buf)?;
@@ -127,7 +147,9 @@ impl FromSql for chrono::DateTime<chrono::Utc> {
 }
 
 impl FromSql for chrono::NaiveDate {
-    fn oid() -> Oid { Oid::DATE }
+    fn oid() -> Oid {
+        Oid::DATE
+    }
 
     fn from_sql(buf: &[u8]) -> Result<Self> {
         let days = i32::from_sql(buf)?;
@@ -139,7 +161,9 @@ impl FromSql for chrono::NaiveDate {
 }
 
 impl FromSql for chrono::NaiveTime {
-    fn oid() -> Oid { Oid::TIME }
+    fn oid() -> Oid {
+        Oid::TIME
+    }
 
     fn from_sql(buf: &[u8]) -> Result<Self> {
         let us = i64::from_sql(buf)?;
@@ -153,7 +177,9 @@ impl FromSql for chrono::NaiveTime {
 // ── UUID ─────────────────────────────────────────────
 
 impl FromSql for uuid::Uuid {
-    fn oid() -> Oid { Oid::UUID }
+    fn oid() -> Oid {
+        Oid::UUID
+    }
 
     fn from_sql(buf: &[u8]) -> Result<Self> {
         let arr: [u8; 16] = buf
@@ -166,8 +192,8 @@ impl FromSql for uuid::Uuid {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bytes::BytesMut;
     use crate::types::ToSql;
+    use bytes::BytesMut;
 
     /// Helper: encode then decode, verify roundtrip.
     fn roundtrip<T: ToSql + FromSql + std::fmt::Debug + PartialEq>(val: &T) {

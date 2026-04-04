@@ -7,28 +7,54 @@ use crate::error::{Error, Result};
 pub enum BackendMessage {
     AuthenticationOk,
     AuthenticationCleartextPassword,
-    AuthenticationMd5Password { salt: [u8; 4] },
-    AuthenticationSasl { mechanisms: Vec<String> },
-    AuthenticationSaslContinue { data: Vec<u8> },
-    AuthenticationSaslFinal { data: Vec<u8> },
+    AuthenticationMd5Password {
+        salt: [u8; 4],
+    },
+    AuthenticationSasl {
+        mechanisms: Vec<String>,
+    },
+    AuthenticationSaslContinue {
+        data: Vec<u8>,
+    },
+    AuthenticationSaslFinal {
+        data: Vec<u8>,
+    },
 
-    BackendKeyData { process_id: i32, secret_key: i32 },
+    BackendKeyData {
+        process_id: i32,
+        secret_key: i32,
+    },
 
-    ParameterStatus { name: String, value: String },
+    ParameterStatus {
+        name: String,
+        value: String,
+    },
 
-    ReadyForQuery { transaction_status: TransactionStatus },
+    ReadyForQuery {
+        transaction_status: TransactionStatus,
+    },
 
-    RowDescription { fields: Vec<FieldDescription> },
+    RowDescription {
+        fields: Vec<FieldDescription>,
+    },
 
-    DataRow { columns: DataRowColumns },
+    DataRow {
+        columns: DataRowColumns,
+    },
 
-    CommandComplete { tag: String },
+    CommandComplete {
+        tag: String,
+    },
 
     EmptyQueryResponse,
 
-    ErrorResponse { fields: ErrorFields },
+    ErrorResponse {
+        fields: ErrorFields,
+    },
 
-    NoticeResponse { fields: ErrorFields },
+    NoticeResponse {
+        fields: ErrorFields,
+    },
 
     ParseComplete,
     BindComplete,
@@ -36,11 +62,21 @@ pub enum BackendMessage {
     NoData,
     PortalSuspended,
 
-    ParameterDescription { oids: Vec<u32> },
+    ParameterDescription {
+        oids: Vec<u32>,
+    },
 
-    CopyInResponse { format: CopyFormat, column_formats: Vec<i16> },
-    CopyOutResponse { format: CopyFormat, column_formats: Vec<i16> },
-    CopyData { data: Bytes },
+    CopyInResponse {
+        format: CopyFormat,
+        column_formats: Vec<i16>,
+    },
+    CopyOutResponse {
+        format: CopyFormat,
+        column_formats: Vec<i16>,
+    },
+    CopyData {
+        data: Bytes,
+    },
     CopyDone,
 
     NotificationResponse {
@@ -134,9 +170,7 @@ impl DataRowColumns {
 
     /// Returns `true` if column `idx` is NULL.
     pub fn is_null(&self, idx: usize) -> bool {
-        self.columns
-            .get(idx)
-            .map_or(true, |&(_, len)| len < 0)
+        self.columns.get(idx).map_or(true, |&(_, len)| len < 0)
     }
 }
 
@@ -166,7 +200,9 @@ pub fn decode(msg_type: u8, body: Bytes) -> Result<BackendMessage> {
         b'd' => Ok(BackendMessage::CopyData { data: body }),
         b'c' => Ok(BackendMessage::CopyDone),
         b'A' => decode_notification(body),
-        _ => Err(Error::protocol(format!("unknown message type: 0x{msg_type:02x}"))),
+        _ => Err(Error::protocol(format!(
+            "unknown message type: 0x{msg_type:02x}"
+        ))),
     }
 }
 
@@ -211,7 +247,9 @@ fn decode_auth(body: Bytes) -> Result<BackendMessage> {
         12 => Ok(BackendMessage::AuthenticationSaslFinal {
             data: body[4..].to_vec(),
         }),
-        _ => Err(Error::protocol(format!("unsupported auth type: {auth_type}"))),
+        _ => Err(Error::protocol(format!(
+            "unsupported auth type: {auth_type}"
+        ))),
     }
 }
 
@@ -451,12 +489,18 @@ fn decode_copy_response(body: &Bytes) -> Result<(CopyFormat, Vec<i16>)> {
 
 fn decode_copy_in_response(body: Bytes) -> Result<BackendMessage> {
     let (format, column_formats) = decode_copy_response(&body)?;
-    Ok(BackendMessage::CopyInResponse { format, column_formats })
+    Ok(BackendMessage::CopyInResponse {
+        format,
+        column_formats,
+    })
 }
 
 fn decode_copy_out_response(body: Bytes) -> Result<BackendMessage> {
     let (format, column_formats) = decode_copy_response(&body)?;
-    Ok(BackendMessage::CopyOutResponse { format, column_formats })
+    Ok(BackendMessage::CopyOutResponse {
+        format,
+        column_formats,
+    })
 }
 
 fn decode_notification(body: Bytes) -> Result<BackendMessage> {
@@ -546,7 +590,7 @@ mod tests {
         let mut data = Vec::new();
         data.extend_from_slice(&2i16.to_be_bytes()); // column count
         data.extend_from_slice(&3i32.to_be_bytes()); // col 0 length
-        data.extend_from_slice(b"abc");               // col 0 data
+        data.extend_from_slice(b"abc"); // col 0 data
         data.extend_from_slice(&(-1i32).to_be_bytes()); // col 1 NULL
 
         let body = Bytes::from(data);
@@ -578,9 +622,12 @@ mod tests {
     #[test]
     fn test_decode_error_response() {
         let mut data = Vec::new();
-        data.push(b'S'); data.extend_from_slice(b"ERROR\0");
-        data.push(b'C'); data.extend_from_slice(b"42P01\0");
-        data.push(b'M'); data.extend_from_slice(b"relation \"foo\" does not exist\0");
+        data.push(b'S');
+        data.extend_from_slice(b"ERROR\0");
+        data.push(b'C');
+        data.extend_from_slice(b"42P01\0");
+        data.push(b'M');
+        data.extend_from_slice(b"relation \"foo\" does not exist\0");
         data.push(0); // terminator
 
         let body = Bytes::from(data);
@@ -605,7 +652,11 @@ mod tests {
         let body = Bytes::from(data);
         let msg = decode(b'A', body).unwrap();
         match msg {
-            BackendMessage::NotificationResponse { process_id, channel, payload } => {
+            BackendMessage::NotificationResponse {
+                process_id,
+                channel,
+                payload,
+            } => {
                 assert_eq!(process_id, 12345);
                 assert_eq!(channel, "my_channel");
                 assert_eq!(payload, "hello world");

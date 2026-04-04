@@ -1,7 +1,6 @@
-
-use crate::error::Result;
-use crate::pipeline::{PipelineQuery, QueryResult, encode_pipeline, read_pipeline_responses};
 use crate::connection::stream::PgConnection;
+use crate::error::Result;
+use crate::pipeline::{encode_pipeline, read_pipeline_responses, PipelineQuery, QueryResult};
 
 /// A batch of queries to be pipelined together.
 ///
@@ -84,8 +83,8 @@ impl Default for PipelineBatch {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bytes::BytesMut;
     use crate::pipeline::encode_pipeline;
+    use bytes::BytesMut;
 
     #[test]
     fn test_batch_empty() {

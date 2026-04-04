@@ -20,11 +20,7 @@ pub struct CopyIn<'a> {
 }
 
 impl<'a> CopyIn<'a> {
-    pub(crate) fn new(
-        conn: &'a mut PgConnection,
-        format: CopyFormat,
-        column_count: usize,
-    ) -> Self {
+    pub(crate) fn new(conn: &'a mut PgConnection, format: CopyFormat, column_count: usize) -> Self {
         Self {
             conn,
             format,
@@ -104,7 +100,10 @@ impl<'a> Drop for CopyIn<'a> {
         if !self.finished {
             // Can't do async in drop — just write CopyFail to buffer.
             // The next operation on the connection will flush it.
-            frontend::copy_fail(self.conn.write_buf(), "COPY IN aborted: dropped without finish");
+            frontend::copy_fail(
+                self.conn.write_buf(),
+                "COPY IN aborted: dropped without finish",
+            );
         }
     }
 }

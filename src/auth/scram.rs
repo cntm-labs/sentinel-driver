@@ -1,6 +1,6 @@
-use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 use hmac::{Hmac, Mac};
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 
 use crate::connection::stream::PgConnection;
 use crate::error::{Error, Result};
@@ -42,23 +42,21 @@ pub(crate) async fn authenticate(
     let client_first_message = format!("n,,{client_first_bare}");
 
     // Send SASLInitialResponse
-    frontend::sasl_initial_response(
-        conn.write_buf(),
-        mechanism,
-        client_first_message.as_bytes(),
-    );
+    frontend::sasl_initial_response(conn.write_buf(), mechanism, client_first_message.as_bytes());
     conn.send().await?;
 
     // Receive server-first-message
     let server_first = match conn.recv().await? {
-        BackendMessage::AuthenticationSaslContinue { data } => {
-            String::from_utf8(data)
-                .map_err(|e| Error::Auth(format!("invalid server-first-message: {e}")))?
-        }
+        BackendMessage::AuthenticationSaslContinue { data } => String::from_utf8(data)
+            .map_err(|e| Error::Auth(format!("invalid server-first-message: {e}")))?,
         BackendMessage::ErrorResponse { fields } => {
             return Err(Error::server(
-                fields.severity, fields.code, fields.message,
-                fields.detail, fields.hint, fields.position,
+                fields.severity,
+                fields.code,
+                fields.message,
+                fields.detail,
+                fields.hint,
+                fields.position,
             ));
         }
         other => {
@@ -73,7 +71,9 @@ pub(crate) async fn authenticate(
 
     // Verify server nonce starts with our client nonce
     if !parsed.nonce.starts_with(&client_nonce) {
-        return Err(Error::Auth("server nonce doesn't match client nonce".into()));
+        return Err(Error::Auth(
+            "server nonce doesn't match client nonce".into(),
+        ));
     }
 
     let salt = BASE64
@@ -120,15 +120,17 @@ pub(crate) async fn authenticate(
             // Verify server signature
             let expected_verifier = format!("v={}", BASE64.encode(&server_signature));
             if server_final != expected_verifier {
-                return Err(Error::Auth(
-                    "server signature verification failed".into(),
-                ));
+                return Err(Error::Auth("server signature verification failed".into()));
             }
         }
         BackendMessage::ErrorResponse { fields } => {
             return Err(Error::server(
-                fields.severity, fields.code, fields.message,
-                fields.detail, fields.hint, fields.position,
+                fields.severity,
+                fields.code,
+                fields.message,
+                fields.detail,
+                fields.hint,
+                fields.position,
             ));
         }
         other => {
@@ -141,12 +143,14 @@ pub(crate) async fn authenticate(
     // Wait for AuthenticationOk
     match conn.recv().await? {
         BackendMessage::AuthenticationOk => Ok(()),
-        BackendMessage::ErrorResponse { fields } => {
-            Err(Error::server(
-                fields.severity, fields.code, fields.message,
-                fields.detail, fields.hint, fields.position,
-            ))
-        }
+        BackendMessage::ErrorResponse { fields } => Err(Error::server(
+            fields.severity,
+            fields.code,
+            fields.message,
+            fields.detail,
+            fields.hint,
+            fields.position,
+        )),
         other => Err(Error::protocol(format!(
             "expected AuthenticationOk, got {other:?}"
         ))),
@@ -206,8 +210,7 @@ fn hi(password: &[u8], salt: &[u8], iterations: u32) -> Vec<u8> {
 }
 
 fn hmac_sha256(key: &[u8], data: &[u8]) -> Vec<u8> {
-    let mut mac = HmacSha256::new_from_slice(key)
-        .expect("HMAC can accept any key length");
+    let mut mac = HmacSha256::new_from_slice(key).expect("HMAC can accept any key length");
     mac.update(data);
     mac.finalize().into_bytes().to_vec()
 }

@@ -164,9 +164,7 @@ impl<'a> BinaryCopyDecoder<'a> {
         }
 
         if field_count < 0 {
-            return Err(Error::Copy(format!(
-                "invalid field count: {field_count}"
-            )));
+            return Err(Error::Copy(format!("invalid field count: {field_count}")));
         }
 
         let mut fields = Vec::with_capacity(field_count as usize);

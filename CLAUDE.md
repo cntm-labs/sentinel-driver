@@ -38,7 +38,7 @@ sentinel-driver/
 │   ├── row.rs              # Row type (zero-copy column access)
 │   ├── statement.rs        # Prepared statement
 │   └── transaction.rs      # Transaction wrapper
-├── sentinel-driver-derive/  # FromRow, ToSql, FromSql proc macros
+├── derive/                  # FromRow, ToSql, FromSql proc macros
 │   └── src/
 ├── docs/
 │   └── plans/
