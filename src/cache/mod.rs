@@ -190,10 +190,6 @@ mod tests {
         Statement::new(String::new(), sql.to_string(), vec![], None)
     }
 
-    fn make_stmt_with_params(sql: &str, params: Vec<Oid>) -> Statement {
-        Statement::new(String::new(), sql.to_string(), params, None)
-    }
-
     #[test]
     fn test_register_and_lookup() {
         let mut cache = StatementCache::new();
