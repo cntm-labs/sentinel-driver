@@ -67,3 +67,9 @@ fn test_builder_statement_timeout() {
         .build();
     assert_eq!(config.statement_timeout(), Some(Duration::from_secs(10)));
 }
+
+#[test]
+fn test_invalid_statement_timeout_rejected() {
+    let result = Config::parse("postgres://user:pass@localhost/db?statement_timeout=abc");
+    assert!(result.is_err());
+}
