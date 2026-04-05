@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use sentinel_driver::CancelToken;
 
 #[test]
@@ -34,4 +36,22 @@ async fn test_cancel_token_cancel_connection_refused() {
     let token = CancelToken::new("127.0.0.1", 1, 12345, 67890);
     let result = token.cancel().await;
     assert!(result.is_err());
+}
+
+#[test]
+fn test_error_timeout_variant_exists() {
+    // Verify the Timeout error variant is usable
+    let err = sentinel_driver::Error::Timeout("test timeout".into());
+    assert!(matches!(err, sentinel_driver::Error::Timeout(_)));
+    assert!(err.to_string().contains("test timeout"));
+}
+
+#[test]
+fn test_config_statement_timeout_propagation() {
+    // Verify Config can carry statement_timeout that Connection would use
+    let config = sentinel_driver::Config::builder()
+        .user("test")
+        .statement_timeout(Duration::from_secs(30))
+        .build();
+    assert_eq!(config.statement_timeout(), Some(Duration::from_secs(30)));
 }

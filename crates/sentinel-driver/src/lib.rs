@@ -69,6 +69,8 @@ pub use types::{FromSql, Oid, ToSql};
 #[cfg(feature = "derive")]
 pub use sentinel_derive::{FromRow, FromSql, ToSql};
 
+use std::time::Duration;
+
 use bytes::BytesMut;
 
 use crate::connection::startup::{self};
@@ -88,6 +90,8 @@ pub struct Connection {
     secret_key: i32,
     transaction_status: TransactionStatus,
     stmt_cache: StatementCache,
+    query_timeout: Option<Duration>,
+    is_broken: bool,
 }
 
 impl Connection {
@@ -95,6 +99,7 @@ impl Connection {
     pub async fn connect(config: Config) -> Result<Self> {
         let mut conn = PgConnection::connect(&config).await?;
         let result = startup::startup(&mut conn, &config).await?;
+        let query_timeout = config.statement_timeout();
 
         Ok(Self {
             conn,
@@ -103,6 +108,8 @@ impl Connection {
             secret_key: result.secret_key,
             transaction_status: result.transaction_status,
             stmt_cache: StatementCache::new(),
+            query_timeout,
+            is_broken: false,
         })
     }
 
@@ -152,6 +159,61 @@ impl Connection {
         match result {
             pipeline::QueryResult::Command(r) => Ok(r.rows_affected),
             pipeline::QueryResult::Rows(_) => Ok(0),
+        }
+    }
+
+    /// Execute a query with a timeout.
+    ///
+    /// If the query does not complete within `timeout`, a cancel request
+    /// is sent to the server and the connection is marked as broken.
+    pub async fn query_with_timeout(
+        &mut self,
+        sql: &str,
+        params: &[&(dyn ToSql + Sync)],
+        timeout: Duration,
+    ) -> Result<Vec<Row>> {
+        let cancel_token = self.cancel_token();
+
+        match tokio::time::timeout(timeout, self.query(sql, params)).await {
+            Ok(result) => result,
+            Err(_elapsed) => {
+                self.is_broken = true;
+                // Fire-and-forget cancel
+                tokio::spawn(async move {
+                    cancel_token.cancel().await.ok();
+                });
+                Err(Error::Timeout(format!(
+                    "query timeout after {}ms",
+                    timeout.as_millis()
+                )))
+            }
+        }
+    }
+
+    /// Execute a non-SELECT query with a timeout.
+    ///
+    /// If the query does not complete within `timeout`, a cancel request
+    /// is sent to the server and the connection is marked as broken.
+    pub async fn execute_with_timeout(
+        &mut self,
+        sql: &str,
+        params: &[&(dyn ToSql + Sync)],
+        timeout: Duration,
+    ) -> Result<u64> {
+        let cancel_token = self.cancel_token();
+
+        match tokio::time::timeout(timeout, self.execute(sql, params)).await {
+            Ok(result) => result,
+            Err(_elapsed) => {
+                self.is_broken = true;
+                tokio::spawn(async move {
+                    cancel_token.cancel().await.ok();
+                });
+                Err(Error::Timeout(format!(
+                    "query timeout after {}ms",
+                    timeout.as_millis()
+                )))
+            }
         }
     }
 
@@ -376,6 +438,19 @@ impl Connection {
             self.process_id,
             self.secret_key,
         )
+    }
+
+    /// Returns the configured query timeout, if any.
+    pub fn query_timeout(&self) -> Option<Duration> {
+        self.query_timeout
+    }
+
+    /// Returns `true` if the connection has been marked broken by a timeout.
+    ///
+    /// A broken connection should be discarded — the server state is
+    /// indeterminate after a cancelled query.
+    pub fn is_broken(&self) -> bool {
+        self.is_broken
     }
 
     /// Current transaction status.
