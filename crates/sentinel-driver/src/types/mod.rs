@@ -5,6 +5,7 @@ pub mod interval;
 pub mod network;
 #[cfg(feature = "with-rust-decimal")]
 pub mod numeric;
+pub mod range;
 
 use crate::error::Result;
 use bytes::BytesMut;
@@ -44,6 +45,18 @@ impl Oid {
     pub const INTERVAL_ARRAY: Oid = Oid(1187);
     pub const NUMERIC: Oid = Oid(1700);
     pub const NUMERIC_ARRAY: Oid = Oid(1231);
+    pub const INT4RANGE: Oid = Oid(3904);
+    pub const INT8RANGE: Oid = Oid(3926);
+    pub const NUMRANGE: Oid = Oid(3906);
+    pub const TSRANGE: Oid = Oid(3908);
+    pub const TSTZRANGE: Oid = Oid(3910);
+    pub const DATERANGE: Oid = Oid(3912);
+    pub const INT4RANGE_ARRAY: Oid = Oid(3905);
+    pub const INT8RANGE_ARRAY: Oid = Oid(3927);
+    pub const NUMRANGE_ARRAY: Oid = Oid(3907);
+    pub const TSRANGE_ARRAY: Oid = Oid(3909);
+    pub const TSTZRANGE_ARRAY: Oid = Oid(3911);
+    pub const DATERANGE_ARRAY: Oid = Oid(3913);
 
     // Array types
     pub const BOOL_ARRAY: Oid = Oid(1000);

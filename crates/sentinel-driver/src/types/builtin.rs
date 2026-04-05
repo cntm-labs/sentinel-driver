@@ -134,4 +134,34 @@ static BUILTIN_TYPES: &[TypeInfo] = &[
         name: "numeric",
         array_oid: Some(Oid::NUMERIC_ARRAY),
     },
+    TypeInfo {
+        oid: Oid::INT4RANGE,
+        name: "int4range",
+        array_oid: Some(Oid::INT4RANGE_ARRAY),
+    },
+    TypeInfo {
+        oid: Oid::INT8RANGE,
+        name: "int8range",
+        array_oid: Some(Oid::INT8RANGE_ARRAY),
+    },
+    TypeInfo {
+        oid: Oid::NUMRANGE,
+        name: "numrange",
+        array_oid: Some(Oid::NUMRANGE_ARRAY),
+    },
+    TypeInfo {
+        oid: Oid::TSRANGE,
+        name: "tsrange",
+        array_oid: Some(Oid::TSRANGE_ARRAY),
+    },
+    TypeInfo {
+        oid: Oid::TSTZRANGE,
+        name: "tstzrange",
+        array_oid: Some(Oid::TSTZRANGE_ARRAY),
+    },
+    TypeInfo {
+        oid: Oid::DATERANGE,
+        name: "daterange",
+        array_oid: Some(Oid::DATERANGE_ARRAY),
+    },
 ];
