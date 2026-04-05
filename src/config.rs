@@ -366,4 +366,3 @@ fn hex_digit(b: u8) -> Result<u8> {
         _ => Err(Error::Config(format!("invalid hex digit: {}", b as char))),
     }
 }
-

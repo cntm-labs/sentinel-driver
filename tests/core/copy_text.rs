@@ -48,8 +48,7 @@ fn test_decode_null() {
 
 #[test]
 fn test_decode_escaped_chars() {
-    let fields =
-        TextCopyDecoder::parse_line("line1\\nline2\tcol1\\tcol2\tback\\\\slash").unwrap();
+    let fields = TextCopyDecoder::parse_line("line1\\nline2\tcol1\\tcol2\tback\\\\slash").unwrap();
     assert_eq!(
         fields,
         vec![
