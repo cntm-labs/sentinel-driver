@@ -1,0 +1,52 @@
+name: Claude Code
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  issue_comment:
+    types: [created]
+
+jobs:
+  claude:
+    if: |
+      (github.event_name == 'pull_request') ||
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      id-token: write
+    steps:
+      - name: Run Claude Code
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          allowed_tools: "Bash,Read,Glob,Grep,Edit,Write"
+          direct_prompt: |
+            You are a PR automation assistant for sentinel-driver (a PostgreSQL wire protocol driver for Rust).
+
+            On PR open, do the following:
+
+            1. **Assign** the PR author using: gh pr edit $PR_NUMBER --add-assignee "$PR_AUTHOR"
+
+            2. **Label** the PR based on changed files and content. Available labels:
+               - `enhancement` — new features or improvements to crate source code
+               - `bug` — bug fixes
+               - `documentation` — docs or markdown changes only
+               - `area: protocol` — changes to crates/sentinel-driver/src/protocol/
+               - `area: connection` — changes to crates/sentinel-driver/src/connection/ or src/lib.rs connection methods
+               - `area: pool` — changes to crates/sentinel-driver/src/pool/
+               - `area: types` — changes to crates/sentinel-driver/src/types/
+               Apply all labels that match. Use: gh pr edit $PR_NUMBER --add-label "label1,label2"
+
+            3. **Link issues** — look at the branch name and PR body for issue references (#N).
+               If found and not already in the body, add "Closes #N" by updating the PR body.
+
+            4. **Comment** on linked issues with a short note like "Implementation PR: #PR_NUMBER"
+
+            Use `gh` CLI for all GitHub operations. The PR number is available in the environment.
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login || github.event.issue.user.login }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

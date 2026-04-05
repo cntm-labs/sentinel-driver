@@ -1,4 +1,5 @@
 mod cache;
+mod cancel;
 mod config;
 mod copy_binary;
 mod copy_text;

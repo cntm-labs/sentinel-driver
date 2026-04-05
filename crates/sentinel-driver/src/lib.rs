@@ -35,6 +35,7 @@
 
 pub mod auth;
 pub mod cache;
+pub mod cancel;
 pub mod config;
 pub mod connection;
 pub mod copy;
@@ -52,6 +53,7 @@ pub mod types;
 // ── Public re-exports ────────────────────────────────
 
 pub use cache::{CacheMetrics, StatementCache};
+pub use cancel::CancelToken;
 pub use config::{Config, SslMode};
 pub use copy::binary::{BinaryCopyDecoder, BinaryCopyEncoder};
 pub use copy::text::{TextCopyDecoder, TextCopyEncoder};
@@ -67,6 +69,8 @@ pub use types::{FromSql, Oid, ToSql};
 #[cfg(feature = "derive")]
 pub use sentinel_derive::{FromRow, FromSql, ToSql};
 
+use std::time::Duration;
+
 use bytes::BytesMut;
 
 use crate::connection::startup::{self};
@@ -81,11 +85,13 @@ use crate::protocol::frontend;
 /// convenient query methods, and transaction support.
 pub struct Connection {
     conn: PgConnection,
-    _config: Config,
+    config: Config,
     process_id: i32,
-    _secret_key: i32,
+    secret_key: i32,
     transaction_status: TransactionStatus,
     stmt_cache: StatementCache,
+    query_timeout: Option<Duration>,
+    is_broken: bool,
 }
 
 impl Connection {
@@ -93,14 +99,17 @@ impl Connection {
     pub async fn connect(config: Config) -> Result<Self> {
         let mut conn = PgConnection::connect(&config).await?;
         let result = startup::startup(&mut conn, &config).await?;
+        let query_timeout = config.statement_timeout();
 
         Ok(Self {
             conn,
-            _config: config,
+            config,
             process_id: result.process_id,
-            _secret_key: result.secret_key,
+            secret_key: result.secret_key,
             transaction_status: result.transaction_status,
             stmt_cache: StatementCache::new(),
+            query_timeout,
+            is_broken: false,
         })
     }
 
@@ -115,6 +124,10 @@ impl Connection {
     /// # }
     /// ```
     pub async fn query(&mut self, sql: &str, params: &[&(dyn ToSql + Sync)]) -> Result<Vec<Row>> {
+        if let Some(timeout) = self.query_timeout {
+            return self.query_with_timeout(sql, params, timeout).await;
+        }
+
         let result = self.query_internal(sql, params).await?;
         match result {
             pipeline::QueryResult::Rows(rows) => Ok(rows),
@@ -146,10 +159,81 @@ impl Connection {
     ///
     /// Returns the number of rows affected.
     pub async fn execute(&mut self, sql: &str, params: &[&(dyn ToSql + Sync)]) -> Result<u64> {
+        if let Some(timeout) = self.query_timeout {
+            return self.execute_with_timeout(sql, params, timeout).await;
+        }
+
         let result = self.query_internal(sql, params).await?;
         match result {
             pipeline::QueryResult::Command(r) => Ok(r.rows_affected),
             pipeline::QueryResult::Rows(_) => Ok(0),
+        }
+    }
+
+    /// Execute a query with a timeout.
+    ///
+    /// If the query does not complete within `timeout`, a cancel request
+    /// is sent to the server and the connection is marked as broken.
+    pub async fn query_with_timeout(
+        &mut self,
+        sql: &str,
+        params: &[&(dyn ToSql + Sync)],
+        timeout: Duration,
+    ) -> Result<Vec<Row>> {
+        let cancel_token = self.cancel_token();
+
+        match tokio::time::timeout(timeout, self.query_internal(sql, params)).await {
+            Ok(result) => {
+                let result = result?;
+                match result {
+                    pipeline::QueryResult::Rows(rows) => Ok(rows),
+                    pipeline::QueryResult::Command(_) => Ok(Vec::new()),
+                }
+            }
+            Err(_elapsed) => {
+                self.is_broken = true;
+                // Fire-and-forget cancel
+                tokio::spawn(async move {
+                    cancel_token.cancel().await.ok();
+                });
+                Err(Error::Timeout(format!(
+                    "query timeout after {}ms",
+                    timeout.as_millis()
+                )))
+            }
+        }
+    }
+
+    /// Execute a non-SELECT query with a timeout.
+    ///
+    /// If the query does not complete within `timeout`, a cancel request
+    /// is sent to the server and the connection is marked as broken.
+    pub async fn execute_with_timeout(
+        &mut self,
+        sql: &str,
+        params: &[&(dyn ToSql + Sync)],
+        timeout: Duration,
+    ) -> Result<u64> {
+        let cancel_token = self.cancel_token();
+
+        match tokio::time::timeout(timeout, self.query_internal(sql, params)).await {
+            Ok(result) => {
+                let result = result?;
+                match result {
+                    pipeline::QueryResult::Command(r) => Ok(r.rows_affected),
+                    pipeline::QueryResult::Rows(_) => Ok(0),
+                }
+            }
+            Err(_elapsed) => {
+                self.is_broken = true;
+                tokio::spawn(async move {
+                    cancel_token.cancel().await.ok();
+                });
+                Err(Error::Timeout(format!(
+                    "query timeout after {}ms",
+                    timeout.as_millis()
+                )))
+            }
         }
     }
 
@@ -361,6 +445,32 @@ impl Connection {
     /// The server process ID for this connection.
     pub fn process_id(&self) -> i32 {
         self.process_id
+    }
+
+    /// Get a cancel token for this connection.
+    ///
+    /// The token can be cloned and sent to another task to cancel a
+    /// running query. See [`CancelToken`] for details.
+    pub fn cancel_token(&self) -> CancelToken {
+        CancelToken::new(
+            self.config.host(),
+            self.config.port(),
+            self.process_id,
+            self.secret_key,
+        )
+    }
+
+    /// Returns the configured query timeout, if any.
+    pub fn query_timeout(&self) -> Option<Duration> {
+        self.query_timeout
+    }
+
+    /// Returns `true` if the connection has been marked broken by a timeout.
+    ///
+    /// A broken connection should be discarded — the server state is
+    /// indeterminate after a cancelled query.
+    pub fn is_broken(&self) -> bool {
+        self.is_broken
     }
 
     /// Current transaction status.
