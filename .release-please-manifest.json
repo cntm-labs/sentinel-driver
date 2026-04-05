@@ -1,4 +1,4 @@
 {
-  "crates/sentinel-derive": "0.1.1",
-  "crates/sentinel-driver": "0.1.1"
+  "crates/sentinel-derive": "0.1.0",
+  "crates/sentinel-driver": "0.1.0"
 }
