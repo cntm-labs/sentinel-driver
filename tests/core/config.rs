@@ -49,12 +49,8 @@ fn invalid_scheme_rejected() {
 
 #[test]
 fn test_parse_statement_timeout() {
-    let config =
-        Config::parse("postgres://user:pass@localhost/db?statement_timeout=5").unwrap();
-    assert_eq!(
-        config.statement_timeout(),
-        Some(Duration::from_secs(5))
-    );
+    let config = Config::parse("postgres://user:pass@localhost/db?statement_timeout=5").unwrap();
+    assert_eq!(config.statement_timeout(), Some(Duration::from_secs(5)));
 }
 
 #[test]
@@ -69,8 +65,5 @@ fn test_builder_statement_timeout() {
         .user("test")
         .statement_timeout(Duration::from_secs(10))
         .build();
-    assert_eq!(
-        config.statement_timeout(),
-        Some(Duration::from_secs(10))
-    );
+    assert_eq!(config.statement_timeout(), Some(Duration::from_secs(10)));
 }
