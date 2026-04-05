@@ -164,4 +164,44 @@ static BUILTIN_TYPES: &[TypeInfo] = &[
         name: "daterange",
         array_oid: Some(Oid::DATERANGE_ARRAY),
     },
+    TypeInfo {
+        oid: Oid::MONEY,
+        name: "money",
+        array_oid: Some(Oid::MONEY_ARRAY),
+    },
+    TypeInfo {
+        oid: Oid::POINT,
+        name: "point",
+        array_oid: None,
+    },
+    TypeInfo {
+        oid: Oid::LINE,
+        name: "line",
+        array_oid: None,
+    },
+    TypeInfo {
+        oid: Oid::LSEG,
+        name: "lseg",
+        array_oid: None,
+    },
+    TypeInfo {
+        oid: Oid::PG_BOX,
+        name: "box",
+        array_oid: None,
+    },
+    TypeInfo {
+        oid: Oid::CIRCLE,
+        name: "circle",
+        array_oid: None,
+    },
+    TypeInfo {
+        oid: Oid::XML,
+        name: "xml",
+        array_oid: Some(Oid::XML_ARRAY),
+    },
+    TypeInfo {
+        oid: Oid::PG_LSN,
+        name: "pg_lsn",
+        array_oid: Some(Oid::PG_LSN_ARRAY),
+    },
 ];

@@ -6,6 +6,10 @@ pub mod network;
 #[cfg(feature = "with-rust-decimal")]
 pub mod numeric;
 pub mod range;
+pub mod money;
+pub mod geometric;
+pub mod xml;
+pub mod lsn;
 
 use crate::error::Result;
 use bytes::BytesMut;
@@ -57,6 +61,19 @@ impl Oid {
     pub const TSRANGE_ARRAY: Oid = Oid(3909);
     pub const TSTZRANGE_ARRAY: Oid = Oid(3911);
     pub const DATERANGE_ARRAY: Oid = Oid(3913);
+    pub const MONEY: Oid = Oid(790);
+    pub const MONEY_ARRAY: Oid = Oid(791);
+    pub const POINT: Oid = Oid(600);
+    pub const LINE: Oid = Oid(628);
+    pub const LSEG: Oid = Oid(601);
+    pub const PG_BOX: Oid = Oid(603);
+    pub const PATH: Oid = Oid(602);
+    pub const POLYGON: Oid = Oid(604);
+    pub const CIRCLE: Oid = Oid(718);
+    pub const XML: Oid = Oid(142);
+    pub const XML_ARRAY: Oid = Oid(143);
+    pub const PG_LSN: Oid = Oid(3220);
+    pub const PG_LSN_ARRAY: Oid = Oid(3221);
 
     // Array types
     pub const BOOL_ARRAY: Oid = Oid(1000);

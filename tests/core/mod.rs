@@ -18,3 +18,6 @@ mod types_interval;
 mod types_network;
 mod types_numeric;
 mod types_range;
+mod types_money;
+mod types_geometric;
+mod types_misc;
