@@ -198,3 +198,76 @@ fn test_macaddr_oid() {
     use sentinel_driver::types::network::PgMacAddr;
     assert_eq!(PgMacAddr([0; 6]).oid(), Oid::MACADDR);
 }
+
+#[test]
+fn test_inet_ipv6_address_truncated() {
+    // AF_INET6, mask=128, not_cidr, addr_len=16, but only 8 bytes of addr data
+    let mut buf = vec![3, 128, 0, 16];
+    buf.extend_from_slice(&[0u8; 8]); // only 8 of 16 address bytes
+    assert!(PgInet::from_sql(&buf).is_err());
+}
+
+#[test]
+fn test_cidr_from_sql_ipv4() {
+    use sentinel_driver::types::network::PgCidr;
+    // Manually build a CIDR binary: AF_INET, mask=24, is_cidr=1, len=4, 10.0.0.0
+    let buf = [2, 24, 1, 4, 10, 0, 0, 0];
+    let decoded = PgCidr::from_sql(&buf).ok();
+    assert_eq!(
+        decoded,
+        Some(PgCidr {
+            addr: IpAddr::V4(Ipv4Addr::new(10, 0, 0, 0)),
+            netmask: 24,
+        })
+    );
+}
+
+#[test]
+fn test_cidr_from_sql_ipv6() {
+    use sentinel_driver::types::network::PgCidr;
+    // Manually build an IPv6 CIDR binary
+    let mut buf = vec![3, 64, 1, 16]; // AF_INET6, mask=64, is_cidr=1, len=16
+    buf.extend_from_slice(&[0x20, 0x01, 0x0d, 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+    let decoded = PgCidr::from_sql(&buf).ok();
+    assert!(decoded.is_some());
+    let decoded = decoded.as_ref();
+    assert_eq!(decoded.map(|c| c.netmask), Some(64));
+}
+
+#[test]
+fn test_inet_from_sql_ipv4() {
+    // Manually decode an IPv4 INET from raw bytes
+    let buf = [2, 32, 0, 4, 127, 0, 0, 1]; // AF_INET, mask=32, not_cidr, len=4, 127.0.0.1
+    let decoded = PgInet::from_sql(&buf).ok();
+    assert_eq!(
+        decoded,
+        Some(PgInet {
+            addr: IpAddr::V4(Ipv4Addr::LOCALHOST),
+            netmask: 32,
+        })
+    );
+}
+
+#[test]
+fn test_inet_from_sql_ipv6() {
+    // Manually decode an IPv6 INET from raw bytes
+    let mut buf = vec![3, 128, 0, 16]; // AF_INET6, mask=128, not_cidr, len=16
+    buf.extend_from_slice(&Ipv6Addr::LOCALHOST.octets());
+    let decoded = PgInet::from_sql(&buf).ok();
+    assert_eq!(
+        decoded,
+        Some(PgInet {
+            addr: IpAddr::V6(Ipv6Addr::LOCALHOST),
+            netmask: 128,
+        })
+    );
+}
+
+#[test]
+fn test_ipaddr_from_sql_v6() {
+    // Manually decode IpAddr from raw IPv6 bytes
+    let mut buf = vec![3, 128, 0, 16];
+    buf.extend_from_slice(&Ipv6Addr::LOCALHOST.octets());
+    let decoded = IpAddr::from_sql(&buf).ok();
+    assert_eq!(decoded, Some(IpAddr::V6(Ipv6Addr::LOCALHOST)));
+}

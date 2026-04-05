@@ -263,3 +263,35 @@ fn test_box_negative_coords() {
     let decoded = PgBox::from_sql(&buf).ok();
     assert_eq!(decoded, Some(val));
 }
+
+// -- FromSql OID static method tests --
+
+#[test]
+fn test_point_from_sql_oid() {
+    assert_eq!(<PgPoint as FromSql>::oid(), Oid::POINT);
+}
+
+#[test]
+fn test_circle_negative_radius() {
+    let val = PgCircle {
+        center: PgPoint { x: 0.0, y: 0.0 },
+        radius: -1.0,
+    };
+    let mut buf = BytesMut::new();
+    val.to_sql(&mut buf).ok();
+    let decoded = PgCircle::from_sql(&buf).ok();
+    assert_eq!(decoded, Some(val));
+}
+
+#[test]
+fn test_line_negative_coefficients() {
+    let val = PgLine {
+        a: -2.5,
+        b: -3.5,
+        c: -4.5,
+    };
+    let mut buf = BytesMut::new();
+    val.to_sql(&mut buf).ok();
+    let decoded = PgLine::from_sql(&buf).ok();
+    assert_eq!(decoded, Some(val));
+}
