@@ -9,12 +9,13 @@ coverage:
         target: 100%
 
 ignore:
-  - "derive/"
+  - "crates/sentinel-derive/"
   - "tests/"
-  - "src/connection/"
-  - "src/tls/"
-  - "src/lib.rs"
-  - "src/copy/mod.rs"
-  - "src/notify/mod.rs"
-  - "src/pool/mod.rs"
-  - "src/pipeline/mod.rs"
+  - "crates/sentinel-driver/src/connection/"
+  - "crates/sentinel-driver/src/tls/"
+  - "crates/sentinel-driver/src/lib.rs"
+  - "crates/sentinel-driver/src/cancel.rs"
+  - "crates/sentinel-driver/src/copy/mod.rs"
+  - "crates/sentinel-driver/src/notify/mod.rs"
+  - "crates/sentinel-driver/src/pool/mod.rs"
+  - "crates/sentinel-driver/src/pipeline/mod.rs"
