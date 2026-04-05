@@ -80,3 +80,30 @@ fn test_bind_with_null_param() {
 
     assert_eq!(buf[0], b'B');
 }
+
+#[test]
+fn test_cancel_request() {
+    use bytes::BytesMut;
+    use sentinel_driver::protocol::frontend;
+
+    let mut buf = BytesMut::new();
+    frontend::cancel_request(&mut buf, 12345, 67890);
+
+    assert_eq!(buf.len(), 16);
+
+    // length = 16
+    let len = i32::from_be_bytes(buf[0..4].try_into().unwrap());
+    assert_eq!(len, 16);
+
+    // magic = 80877102
+    let magic = i32::from_be_bytes(buf[4..8].try_into().unwrap());
+    assert_eq!(magic, 80877102);
+
+    // process_id
+    let pid = i32::from_be_bytes(buf[8..12].try_into().unwrap());
+    assert_eq!(pid, 12345);
+
+    // secret_key
+    let key = i32::from_be_bytes(buf[12..16].try_into().unwrap());
+    assert_eq!(key, 67890);
+}

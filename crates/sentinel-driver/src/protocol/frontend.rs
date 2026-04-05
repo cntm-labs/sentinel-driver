@@ -196,6 +196,19 @@ pub fn sasl_response(buf: &mut BytesMut, data: &[u8]) {
     });
 }
 
+/// CancelRequest — sent on a new connection to cancel a running query.
+///
+/// Format: `[length: i32 = 16][magic: i32 = 80877102][process_id: i32][secret_key: i32]`
+///
+/// Unlike other messages, CancelRequest has no type byte — it uses a
+/// length prefix + magic number, similar to StartupMessage and SSLRequest.
+pub fn cancel_request(buf: &mut BytesMut, process_id: i32, secret_key: i32) {
+    buf.put_i32(16); // total length
+    buf.put_i32(80877102); // cancel request code
+    buf.put_i32(process_id);
+    buf.put_i32(secret_key);
+}
+
 // ── Helpers ──────────────────────────────────────────
 
 /// Encode a PG wire protocol message: `[type: u8][length: i32][payload]`.
