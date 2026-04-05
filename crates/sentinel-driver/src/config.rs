@@ -49,7 +49,7 @@ pub struct Config {
     pub(crate) ssl_mode: SslMode,
     pub(crate) application_name: Option<String>,
     pub(crate) connect_timeout: Duration,
-    pub(crate) _statement_timeout: Option<Duration>,
+    pub(crate) statement_timeout: Option<Duration>,
     pub(crate) _keepalive: Option<Duration>,
     pub(crate) _keepalive_idle: Option<Duration>,
     pub(crate) _target_session_attrs: TargetSessionAttrs,
@@ -161,6 +161,12 @@ impl Config {
                         })?;
                         config = config.connect_timeout(Duration::from_secs(secs));
                     }
+                    "statement_timeout" => {
+                        let secs: u64 = value.parse().map_err(|_| {
+                            Error::Config(format!("invalid statement_timeout: {value}"))
+                        })?;
+                        config = config.statement_timeout(Duration::from_secs(secs));
+                    }
                     "target_session_attrs" => {
                         config = config.target_session_attrs(match value.as_str() {
                             "any" => TargetSessionAttrs::Any,
@@ -220,6 +226,10 @@ impl Config {
 
     pub fn connect_timeout(&self) -> Duration {
         self.connect_timeout
+    }
+
+    pub fn statement_timeout(&self) -> Option<Duration> {
+        self.statement_timeout
     }
 }
 
@@ -326,7 +336,7 @@ impl ConfigBuilder {
             ssl_mode: self.ssl_mode,
             application_name: self.application_name,
             connect_timeout: self.connect_timeout,
-            _statement_timeout: self.statement_timeout,
+            statement_timeout: self.statement_timeout,
             _keepalive: self.keepalive,
             _keepalive_idle: self.keepalive_idle,
             _target_session_attrs: self.target_session_attrs,
