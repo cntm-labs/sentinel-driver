@@ -51,5 +51,8 @@ sentinel-derive = { path = "../sentinel-derive", optional = true }
 default = ["derive"]
 derive = ["dep:sentinel-derive"]
 
+[lints]
+workspace = true
+
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }
