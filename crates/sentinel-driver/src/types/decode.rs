@@ -189,3 +189,111 @@ impl FromSql for uuid::Uuid {
         Ok(uuid::Uuid::from_bytes(arr))
     }
 }
+
+// ── Array types ─────────────────────────────────────
+
+/// Decode a PostgreSQL 1-D binary array into `Vec<T>`.
+/// Read a big-endian i32 from a byte slice at the given offset.
+fn read_i32(buf: &[u8], offset: usize) -> i32 {
+    i32::from_be_bytes([
+        buf[offset],
+        buf[offset + 1],
+        buf[offset + 2],
+        buf[offset + 3],
+    ])
+}
+
+/// Read a big-endian u32 from a byte slice at the given offset.
+fn read_u32(buf: &[u8], offset: usize) -> u32 {
+    u32::from_be_bytes([
+        buf[offset],
+        buf[offset + 1],
+        buf[offset + 2],
+        buf[offset + 3],
+    ])
+}
+
+fn decode_array<T: FromSql>(buf: &[u8], expected_elem_oid: Oid) -> Result<Vec<T>> {
+    if buf.len() < 12 {
+        return Err(Error::Decode("array: header too short".into()));
+    }
+
+    let ndim = read_i32(buf, 0);
+    // has_null at buf[4..8] — we reject NULLs in element loop
+    let elem_oid = read_u32(buf, 8);
+
+    if ndim == 0 {
+        return Ok(Vec::new());
+    }
+
+    if ndim != 1 {
+        return Err(Error::Decode(format!(
+            "array: multi-dimensional arrays not supported (ndim={ndim})"
+        )));
+    }
+
+    if elem_oid != expected_elem_oid.0 {
+        return Err(Error::Decode(format!(
+            "array: expected element OID {}, got {elem_oid}",
+            expected_elem_oid.0
+        )));
+    }
+
+    if buf.len() < 20 {
+        return Err(Error::Decode("array: dimension header too short".into()));
+    }
+
+    let dim_len = read_i32(buf, 12) as usize;
+    // dim_lbound at buf[16..20] — skip, not needed for decoding
+
+    let mut offset = 20;
+    let mut result = Vec::with_capacity(dim_len);
+
+    for _ in 0..dim_len {
+        if offset + 4 > buf.len() {
+            return Err(Error::Decode("array: unexpected end of data".into()));
+        }
+
+        let elem_len = read_i32(buf, offset);
+        offset += 4;
+
+        if elem_len < 0 {
+            return Err(Error::Decode("array: NULL elements not supported".into()));
+        }
+
+        let elem_len = elem_len as usize;
+        if offset + elem_len > buf.len() {
+            return Err(Error::Decode("array: element data truncated".into()));
+        }
+
+        let elem = T::from_sql(&buf[offset..offset + elem_len])?;
+        result.push(elem);
+        offset += elem_len;
+    }
+
+    Ok(result)
+}
+
+/// Macro to implement `FromSql` for `Vec<T>` for a specific element type.
+macro_rules! impl_array_from_sql {
+    ($elem_ty:ty, $array_oid:expr, $elem_oid:expr) => {
+        impl FromSql for Vec<$elem_ty> {
+            fn oid() -> Oid {
+                $array_oid
+            }
+
+            fn from_sql(buf: &[u8]) -> Result<Self> {
+                decode_array::<$elem_ty>(buf, $elem_oid)
+            }
+        }
+    };
+}
+
+impl_array_from_sql!(bool, Oid::BOOL_ARRAY, Oid::BOOL);
+impl_array_from_sql!(i16, Oid::INT2_ARRAY, Oid::INT2);
+impl_array_from_sql!(i32, Oid::INT4_ARRAY, Oid::INT4);
+impl_array_from_sql!(i64, Oid::INT8_ARRAY, Oid::INT8);
+impl_array_from_sql!(f32, Oid::FLOAT4_ARRAY, Oid::FLOAT4);
+impl_array_from_sql!(f64, Oid::FLOAT8_ARRAY, Oid::FLOAT8);
+impl_array_from_sql!(String, Oid::TEXT_ARRAY, Oid::TEXT);
+impl_array_from_sql!(uuid::Uuid, Oid::UUID_ARRAY, Oid::UUID);

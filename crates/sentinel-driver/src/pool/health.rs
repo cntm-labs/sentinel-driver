@@ -1,5 +1,31 @@
 use std::time::Instant;
 
+use crate::connection::stream::PgConnection;
+use crate::protocol::backend::BackendMessage;
+use crate::protocol::frontend;
+
+/// Check if a connection is still alive by sending an empty query.
+///
+/// Sends `""` via simple query protocol. The server responds with
+/// `EmptyQueryResponse` + `ReadyForQuery`. Returns `false` on any error.
+/// Cost: ~50us round-trip.
+pub(crate) async fn check_alive(conn: &mut PgConnection) -> bool {
+    frontend::query(conn.write_buf(), "");
+    try_check_alive(conn).await.unwrap_or(false)
+}
+
+/// Inner function that uses `?` for unified error handling.
+async fn try_check_alive(conn: &mut PgConnection) -> crate::error::Result<bool> {
+    conn.send().await?;
+
+    // Drain until ReadyForQuery
+    loop {
+        if matches!(conn.recv().await?, BackendMessage::ReadyForQuery { .. }) {
+            return Ok(true);
+        }
+    }
+}
+
 /// Strategy for checking connection health.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HealthCheckStrategy {

@@ -56,3 +56,11 @@ workspace = true
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }
+
+[[test]]
+name = "core_tests"
+path = "../../tests/core_tests.rs"
+
+[[test]]
+name = "postgres_tests"
+path = "../../tests/postgres_tests.rs"

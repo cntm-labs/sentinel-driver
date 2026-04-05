@@ -193,3 +193,74 @@ impl ToSql for uuid::Uuid {
         Ok(())
     }
 }
+
+// ── Array types ─────────────────────────────────────
+
+/// Encode a `Vec<T>` as a PostgreSQL 1-D binary array.
+///
+/// Wire format:
+/// - i32 ndim (0 for empty, 1 for non-empty)
+/// - i32 has_null (always 0 — nullable elements not supported)
+/// - u32 element_oid
+/// - i32 dim_len (array length)
+/// - i32 dim_lbound (always 1, PG arrays are 1-based)
+/// - for each element: i32 data_len + encoded bytes
+fn encode_array<T: ToSql>(vec: &[T], element_oid: Oid, buf: &mut BytesMut) -> Result<()> {
+    if vec.is_empty() {
+        buf.put_i32(0); // ndim = 0
+        buf.put_i32(0); // has_null = 0
+        buf.put_u32(element_oid.0);
+        return Ok(());
+    }
+
+    buf.put_i32(1); // ndim = 1
+    buf.put_i32(0); // has_null = 0
+    buf.put_u32(element_oid.0);
+    buf.put_i32(vec.len() as i32); // dim_len
+    buf.put_i32(1); // dim_lbound (1-based)
+
+    for elem in vec {
+        let len_pos = buf.len();
+        buf.put_i32(0); // placeholder for element length
+        let data_start = buf.len();
+        elem.to_sql(buf)?;
+        let data_len = (buf.len() - data_start) as i32;
+        buf[len_pos..len_pos + 4].copy_from_slice(&data_len.to_be_bytes());
+    }
+
+    Ok(())
+}
+
+/// Macro to implement `ToSql` for `Vec<T>` for a specific element type.
+macro_rules! impl_array_to_sql {
+    ($elem_ty:ty, $array_oid:expr, $elem_oid:expr) => {
+        impl ToSql for Vec<$elem_ty> {
+            fn oid(&self) -> Oid {
+                $array_oid
+            }
+
+            fn to_sql(&self, buf: &mut BytesMut) -> Result<()> {
+                encode_array(self, $elem_oid, buf)
+            }
+        }
+    };
+}
+
+impl_array_to_sql!(bool, Oid::BOOL_ARRAY, Oid::BOOL);
+impl_array_to_sql!(i16, Oid::INT2_ARRAY, Oid::INT2);
+impl_array_to_sql!(i32, Oid::INT4_ARRAY, Oid::INT4);
+impl_array_to_sql!(i64, Oid::INT8_ARRAY, Oid::INT8);
+impl_array_to_sql!(f32, Oid::FLOAT4_ARRAY, Oid::FLOAT4);
+impl_array_to_sql!(f64, Oid::FLOAT8_ARRAY, Oid::FLOAT8);
+impl_array_to_sql!(String, Oid::TEXT_ARRAY, Oid::TEXT);
+impl_array_to_sql!(uuid::Uuid, Oid::UUID_ARRAY, Oid::UUID);
+
+impl ToSql for Vec<&str> {
+    fn oid(&self) -> Oid {
+        Oid::TEXT_ARRAY
+    }
+
+    fn to_sql(&self, buf: &mut BytesMut) -> Result<()> {
+        encode_array(self, Oid::TEXT, buf)
+    }
+}
