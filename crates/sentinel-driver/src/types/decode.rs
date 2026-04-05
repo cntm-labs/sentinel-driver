@@ -257,9 +257,7 @@ fn decode_array<T: FromSql>(buf: &[u8], expected_elem_oid: Oid) -> Result<Vec<T>
         offset += 4;
 
         if elem_len < 0 {
-            return Err(Error::Decode(
-                "array: NULL elements not supported".into(),
-            ));
+            return Err(Error::Decode("array: NULL elements not supported".into()));
         }
 
         let elem_len = elem_len as usize;
