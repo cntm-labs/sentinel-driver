@@ -12,7 +12,7 @@ use crate::connection::startup;
 use crate::connection::stream::PgConnection;
 use crate::error::{Error, Result};
 use crate::pool::config::PoolConfig;
-use crate::pool::health::ConnectionMeta;
+use crate::pool::health::{ConnectionMeta, HealthCheckStrategy};
 
 /// An idle connection in the pool, with its metadata.
 struct IdleConnection {
@@ -102,15 +102,29 @@ impl Pool {
         };
 
         if let Some(idle) = idle_conn {
-            if self.is_healthy(&idle.meta) {
+            if self.is_fresh(&idle.meta) {
+                let mut conn = idle.conn;
+                // If Query strategy, verify connection is alive
+                if self.shared.pool_config.health_check == HealthCheckStrategy::Query
+                    && !health::check_alive(&mut conn).await
+                {
+                    debug!("idle connection failed health check, creating new one");
+                    self.decrement_count().await;
+                    let (conn, meta) = self.create_connection().await?;
+                    return Ok(PooledConnection {
+                        conn: Some(conn),
+                        meta,
+                        shared: Arc::clone(&self.shared),
+                    });
+                }
                 debug!("reusing idle connection");
                 Ok(PooledConnection {
-                    conn: Some(idle.conn),
+                    conn: Some(conn),
                     meta: idle.meta,
                     shared: Arc::clone(&self.shared),
                 })
             } else {
-                debug!("idle connection unhealthy, creating new one");
+                debug!("idle connection expired, creating new one");
                 self.decrement_count().await;
                 let (conn, meta) = self.create_connection().await?;
                 Ok(PooledConnection {
@@ -164,7 +178,7 @@ impl Pool {
         state.total_count = state.total_count.saturating_sub(1);
     }
 
-    fn is_healthy(&self, meta: &ConnectionMeta) -> bool {
+    fn is_fresh(&self, meta: &ConnectionMeta) -> bool {
         if meta.is_broken {
             return false;
         }
