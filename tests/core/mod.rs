@@ -14,3 +14,4 @@ mod transaction;
 mod types_builtin;
 mod types_decode;
 mod types_encode;
+mod types_interval;

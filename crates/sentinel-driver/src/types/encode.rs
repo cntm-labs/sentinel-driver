@@ -254,6 +254,7 @@ impl_array_to_sql!(f32, Oid::FLOAT4_ARRAY, Oid::FLOAT4);
 impl_array_to_sql!(f64, Oid::FLOAT8_ARRAY, Oid::FLOAT8);
 impl_array_to_sql!(String, Oid::TEXT_ARRAY, Oid::TEXT);
 impl_array_to_sql!(uuid::Uuid, Oid::UUID_ARRAY, Oid::UUID);
+impl_array_to_sql!(crate::types::interval::PgInterval, Oid::INTERVAL_ARRAY, Oid::INTERVAL);
 
 impl ToSql for Vec<&str> {
     fn oid(&self) -> Oid {

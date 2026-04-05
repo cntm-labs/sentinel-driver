@@ -109,4 +109,9 @@ static BUILTIN_TYPES: &[TypeInfo] = &[
         name: "jsonb",
         array_oid: None,
     },
+    TypeInfo {
+        oid: Oid::INTERVAL,
+        name: "interval",
+        array_oid: Some(Oid::INTERVAL_ARRAY),
+    },
 ];
