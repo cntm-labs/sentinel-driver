@@ -1,15 +1,15 @@
 pub mod builtin;
 pub mod decode;
 pub mod encode;
+pub mod geometric;
 pub mod interval;
+pub mod lsn;
+pub mod money;
 pub mod network;
 #[cfg(feature = "with-rust-decimal")]
 pub mod numeric;
 pub mod range;
-pub mod money;
-pub mod geometric;
 pub mod xml;
-pub mod lsn;
 
 use crate::error::Result;
 use bytes::BytesMut;

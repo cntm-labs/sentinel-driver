@@ -7,8 +7,7 @@ fn test_range_empty_i32() {
     let range: PgRange<i32> = PgRange::empty(Oid::INT4RANGE, Oid::INT4);
     let mut buf = BytesMut::new();
     range.to_sql(&mut buf).ok();
-    let decoded =
-        PgRange::<i32>::from_sql_with_oids(&buf, Oid::INT4RANGE, Oid::INT4).ok();
+    let decoded = PgRange::<i32>::from_sql_with_oids(&buf, Oid::INT4RANGE, Oid::INT4).ok();
     assert!(decoded.is_some());
     assert!(decoded.as_ref().map_or(false, |r| r.is_empty));
 }
@@ -24,8 +23,7 @@ fn test_range_inclusive_i32() {
     };
     let mut buf = BytesMut::new();
     range.to_sql(&mut buf).ok();
-    let decoded =
-        PgRange::<i32>::from_sql_with_oids(&buf, Oid::INT4RANGE, Oid::INT4).ok();
+    let decoded = PgRange::<i32>::from_sql_with_oids(&buf, Oid::INT4RANGE, Oid::INT4).ok();
     let decoded = decoded.as_ref();
     assert_eq!(decoded.map(|r| &r.lower), Some(&RangeBound::Inclusive(1)));
     assert_eq!(decoded.map(|r| &r.upper), Some(&RangeBound::Inclusive(10)));
@@ -42,14 +40,10 @@ fn test_range_exclusive_i64() {
     };
     let mut buf = BytesMut::new();
     range.to_sql(&mut buf).ok();
-    let decoded =
-        PgRange::<i64>::from_sql_with_oids(&buf, Oid::INT8RANGE, Oid::INT8).ok();
+    let decoded = PgRange::<i64>::from_sql_with_oids(&buf, Oid::INT8RANGE, Oid::INT8).ok();
     let decoded = decoded.as_ref();
     assert_eq!(decoded.map(|r| &r.lower), Some(&RangeBound::Exclusive(0)));
-    assert_eq!(
-        decoded.map(|r| &r.upper),
-        Some(&RangeBound::Exclusive(100))
-    );
+    assert_eq!(decoded.map(|r| &r.upper), Some(&RangeBound::Exclusive(100)));
 }
 
 #[test]
@@ -63,8 +57,7 @@ fn test_range_unbounded_lower() {
     };
     let mut buf = BytesMut::new();
     range.to_sql(&mut buf).ok();
-    let decoded =
-        PgRange::<i32>::from_sql_with_oids(&buf, Oid::INT4RANGE, Oid::INT4).ok();
+    let decoded = PgRange::<i32>::from_sql_with_oids(&buf, Oid::INT4RANGE, Oid::INT4).ok();
     let decoded = decoded.as_ref();
     assert_eq!(
         decoded.map(|r| &r.lower),
@@ -84,8 +77,7 @@ fn test_range_unbounded_both() {
     };
     let mut buf = BytesMut::new();
     range.to_sql(&mut buf).ok();
-    let decoded =
-        PgRange::<i32>::from_sql_with_oids(&buf, Oid::INT4RANGE, Oid::INT4).ok();
+    let decoded = PgRange::<i32>::from_sql_with_oids(&buf, Oid::INT4RANGE, Oid::INT4).ok();
     let decoded = decoded.as_ref();
     assert_eq!(
         decoded.map(|r| &r.lower),

@@ -130,9 +130,7 @@ impl<T: FromSql> PgRange<T> {
             ]) as usize;
             offset += 4;
             if offset + len > buf.len() {
-                return Err(Error::Decode(
-                    "range: lower bound data truncated".into(),
-                ));
+                return Err(Error::Decode("range: lower bound data truncated".into()));
             }
             let val = T::from_sql(&buf[offset..offset + len])?;
             offset += len;
@@ -157,9 +155,7 @@ impl<T: FromSql> PgRange<T> {
             ]) as usize;
             offset += 4;
             if offset + len > buf.len() {
-                return Err(Error::Decode(
-                    "range: upper bound data truncated".into(),
-                ));
+                return Err(Error::Decode("range: upper bound data truncated".into()));
             }
             let val = T::from_sql(&buf[offset..offset + len])?;
             if flags & RANGE_UB_INC != 0 {

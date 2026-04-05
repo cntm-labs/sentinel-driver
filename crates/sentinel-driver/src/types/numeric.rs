@@ -60,8 +60,7 @@ impl ToSql for Decimal {
         let int_pad = (4 - (int_part_len % 4)) % 4;
 
         // Pad right so fractional part is multiple of 4
-        let frac_part_len = total_len - point_pos
-            + (scale as usize).saturating_sub(total_len);
+        let frac_part_len = total_len - point_pos + (scale as usize).saturating_sub(total_len);
         let frac_pad = (4 - (frac_part_len % 4)) % 4;
 
         let mut padded = String::new();
