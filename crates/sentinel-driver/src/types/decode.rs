@@ -193,24 +193,34 @@ impl FromSql for uuid::Uuid {
 // ── Array types ─────────────────────────────────────
 
 /// Decode a PostgreSQL 1-D binary array into `Vec<T>`.
+/// Read a big-endian i32 from a byte slice at the given offset.
+fn read_i32(buf: &[u8], offset: usize) -> i32 {
+    i32::from_be_bytes([
+        buf[offset],
+        buf[offset + 1],
+        buf[offset + 2],
+        buf[offset + 3],
+    ])
+}
+
+/// Read a big-endian u32 from a byte slice at the given offset.
+fn read_u32(buf: &[u8], offset: usize) -> u32 {
+    u32::from_be_bytes([
+        buf[offset],
+        buf[offset + 1],
+        buf[offset + 2],
+        buf[offset + 3],
+    ])
+}
+
 fn decode_array<T: FromSql>(buf: &[u8], expected_elem_oid: Oid) -> Result<Vec<T>> {
     if buf.len() < 12 {
         return Err(Error::Decode("array: header too short".into()));
     }
 
-    let ndim = i32::from_be_bytes(
-        buf[0..4]
-            .try_into()
-            .map_err(|_| Error::Decode("array: invalid ndim".into()))?,
-    );
-
+    let ndim = read_i32(buf, 0);
     // has_null at buf[4..8] — we reject NULLs in element loop
-
-    let elem_oid = u32::from_be_bytes(
-        buf[8..12]
-            .try_into()
-            .map_err(|_| Error::Decode("array: invalid element oid".into()))?,
-    );
+    let elem_oid = read_u32(buf, 8);
 
     if ndim == 0 {
         return Ok(Vec::new());
@@ -233,12 +243,7 @@ fn decode_array<T: FromSql>(buf: &[u8], expected_elem_oid: Oid) -> Result<Vec<T>
         return Err(Error::Decode("array: dimension header too short".into()));
     }
 
-    let dim_len = i32::from_be_bytes(
-        buf[12..16]
-            .try_into()
-            .map_err(|_| Error::Decode("array: invalid dim_len".into()))?,
-    ) as usize;
-
+    let dim_len = read_i32(buf, 12) as usize;
     // dim_lbound at buf[16..20] — skip, not needed for decoding
 
     let mut offset = 20;
@@ -249,11 +254,7 @@ fn decode_array<T: FromSql>(buf: &[u8], expected_elem_oid: Oid) -> Result<Vec<T>
             return Err(Error::Decode("array: unexpected end of data".into()));
         }
 
-        let elem_len = i32::from_be_bytes(
-            buf[offset..offset + 4]
-                .try_into()
-                .map_err(|_| Error::Decode("array: invalid element length".into()))?,
-        );
+        let elem_len = read_i32(buf, offset);
         offset += 4;
 
         if elem_len < 0 {
