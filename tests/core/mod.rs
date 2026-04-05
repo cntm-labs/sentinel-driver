@@ -16,3 +16,4 @@ mod types_decode;
 mod types_encode;
 mod types_interval;
 mod types_network;
+mod types_numeric;

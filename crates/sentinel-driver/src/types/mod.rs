@@ -3,6 +3,8 @@ pub mod decode;
 pub mod encode;
 pub mod interval;
 pub mod network;
+#[cfg(feature = "with-rust-decimal")]
+pub mod numeric;
 
 use crate::error::Result;
 use bytes::BytesMut;
@@ -40,6 +42,8 @@ impl Oid {
     pub const MACADDR_ARRAY: Oid = Oid(1040);
     pub const INTERVAL: Oid = Oid(1186);
     pub const INTERVAL_ARRAY: Oid = Oid(1187);
+    pub const NUMERIC: Oid = Oid(1700);
+    pub const NUMERIC_ARRAY: Oid = Oid(1231);
 
     // Array types
     pub const BOOL_ARRAY: Oid = Oid(1000);

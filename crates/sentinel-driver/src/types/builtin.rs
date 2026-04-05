@@ -129,4 +129,9 @@ static BUILTIN_TYPES: &[TypeInfo] = &[
         name: "macaddr",
         array_oid: Some(Oid::MACADDR_ARRAY),
     },
+    TypeInfo {
+        oid: Oid::NUMERIC,
+        name: "numeric",
+        array_oid: Some(Oid::NUMERIC_ARRAY),
+    },
 ];
