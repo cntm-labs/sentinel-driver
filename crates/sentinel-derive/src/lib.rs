@@ -10,7 +10,7 @@ use syn::{parse_macro_input, Data, DeriveInput, Fields, Type};
 /// # Example
 ///
 /// ```rust,ignore
-/// use sentinel_driver_derive::FromRow;
+/// use sentinel_derive::FromRow;
 ///
 /// #[derive(FromRow)]
 /// struct User {
@@ -85,7 +85,7 @@ fn impl_from_row(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
 /// # Example
 ///
 /// ```rust,ignore
-/// use sentinel_driver_derive::ToSql;
+/// use sentinel_derive::ToSql;
 ///
 /// #[derive(ToSql)]
 /// struct UserId(i32);
@@ -127,7 +127,7 @@ fn impl_to_sql(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
 /// # Example
 ///
 /// ```rust,ignore
-/// use sentinel_driver_derive::FromSql;
+/// use sentinel_derive::FromSql;
 ///
 /// #[derive(FromSql)]
 /// struct UserId(i32);

@@ -15,37 +15,40 @@ Can be used independently as a standalone PG driver crate.
 ## Project Structure
 ```
 sentinel-driver/
-├── src/
-│   ├── lib.rs              # Public API
-│   ├── config.rs           # Connection configuration
-│   ├── error.rs            # Error types
-│   ├── protocol/
-│   │   ├── frontend.rs     # Client-to-server messages
-│   │   ├── backend.rs      # Server-to-client messages
-│   │   └── codec.rs        # Encoder/decoder (zero-copy)
-│   ├── connection/
-│   │   ├── stream.rs       # TCP/TLS stream
-│   │   └── startup.rs      # Handshake + auth
-│   ├── auth/
-│   │   ├── scram.rs        # SCRAM-SHA-256 (correct SASLprep)
-│   │   └── md5.rs          # MD5 (legacy)
-│   ├── pool/               # Connection pool (<0.5 μs checkout)
-│   ├── pipeline/           # PG pipeline mode (auto-batch)
-│   ├── copy/               # COPY IN/OUT (binary + text)
-│   ├── notify/             # LISTEN/NOTIFY engine
-│   ├── types/              # PG type encode/decode (binary format)
-│   ├── tls/                # rustls integration
-│   ├── row.rs              # Row type (zero-copy column access)
-│   ├── statement.rs        # Prepared statement
-│   └── transaction.rs      # Transaction wrapper
+├── crates/
+│   ├── sentinel-driver/        # Main driver crate
+│   │   └── src/
+│   │       ├── lib.rs          # Public API
+│   │       ├── config.rs       # Connection configuration
+│   │       ├── error.rs        # Error types
+│   │       ├── protocol/
+│   │       │   ├── frontend.rs # Client-to-server messages
+│   │       │   ├── backend.rs  # Server-to-client messages
+│   │       │   └── codec.rs    # Encoder/decoder (zero-copy)
+│   │       ├── connection/
+│   │       │   ├── stream.rs   # TCP/TLS stream
+│   │       │   └── startup.rs  # Handshake + auth
+│   │       ├── auth/
+│   │       │   ├── scram.rs    # SCRAM-SHA-256 (correct SASLprep)
+│   │       │   └── md5.rs      # MD5 (legacy)
+│   │       ├── pool/           # Connection pool (<0.5 μs checkout)
+│   │       ├── pipeline/       # PG pipeline mode (auto-batch)
+│   │       ├── copy/           # COPY IN/OUT (binary + text)
+│   │       ├── notify/         # LISTEN/NOTIFY engine
+│   │       ├── types/          # PG type encode/decode (binary format)
+│   │       ├── tls/            # rustls integration
+│   │       ├── row.rs          # Row type (zero-copy column access)
+│   │       ├── statement.rs    # Prepared statement
+│   │       └── transaction.rs  # Transaction wrapper
+│   └── sentinel-derive/        # Derive macros crate
+│       └── src/
+│           └── lib.rs          # FromRow, ToSql, FromSql
 ├── tests/
 │   ├── core/               # Unit-level integration tests (no PG required)
 │   ├── postgres/           # Live PG integration tests (DATABASE_URL required)
 │   ├── docker-compose.yml  # PG 13/16/17 for local testing
 │   ├── fixtures/           # Test data files
 │   └── certs/              # TLS test certificates
-├── derive/                  # FromRow, ToSql, FromSql proc macros
-│   └── src/
 ├── .github/
 │   ├── workflows/          # CI: lint, test, pg-matrix, coverage, release
 │   ├── ISSUE_TEMPLATE/     # Bug report, feature request, docs
@@ -57,7 +60,8 @@ sentinel-driver/
 ├── clippy.toml             # Clippy config (disallowed methods, thresholds)
 ├── rustfmt.toml            # Format config (edition 2021, max_width 100)
 ├── .editorconfig           # Editor config
-└── Cargo.toml              # Workspace with [lints] config
+├── Cargo.toml              # Workspace root (no package)
+└── Cargo.lock
 ```
 
 ## Build Commands
@@ -99,8 +103,7 @@ git config core.hooksPath .githooks   # Enable pre-commit hook
 - Connection pool (deadpool-style, <0.5 μs checkout)
 
 ## Conventions
-- Minimal unsafe — only where required for zero-copy parsing
-- All unsafe must have SAFETY comment explaining invariant
+- No unsafe code — zero-copy via `bytes::Bytes` safe API (unsafe_code = "forbid")
 - Binary format for all PG types by default
 - Every public API must be documented
 - 100% test coverage target

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "packages": {
+    "crates/sentinel-derive": {
+      "release-type": "rust",
+      "component": "sentinel-derive",
+      "bump-minor-pre-major": true,
+      "bump-patch-for-minor-pre-major": true
+    },
+    "crates/sentinel-driver": {
+      "release-type": "rust",
+      "component": "sentinel-driver",
+      "bump-minor-pre-major": true,
+      "bump-patch-for-minor-pre-major": true,
+      "extra-files": [
+        {
+          "type": "toml",
+          "path": "Cargo.toml",
+          "glob": true,
+          "jsonpath": "$.dependencies.sentinel-derive.version"
+        }
+      ]
+    }
+  },
+  "group-pull-request-title-pattern": "chore: release ${version}",
+  "linked-versions": [
+    {
+      "tag": "v",
+      "components": ["sentinel-derive", "sentinel-driver"]
+    }
+  ]
+}
