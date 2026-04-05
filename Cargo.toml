@@ -7,6 +7,11 @@ version = "0.1.0"
 edition = "2021"
 description = "High-performance PostgreSQL wire protocol driver for Rust"
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/cntm-labs/sentinel-driver"
+homepage = "https://github.com/cntm-labs/sentinel-driver"
+keywords = ["postgresql", "database", "driver", "async", "tokio"]
+categories = ["database"]
+readme = "README.md"
 rust-version = "1.75"
 
 [lints]
@@ -46,11 +51,11 @@ tracing = "0.1"
 lru = "0.12"
 
 # Derive macros
-sentinel-driver-derive = { path = "derive", optional = true }
+sentinel-derive = { path = "derive", optional = true }
 
 [features]
 default = ["derive"]
-derive = ["dep:sentinel-driver-derive"]
+derive = ["dep:sentinel-derive"]
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }

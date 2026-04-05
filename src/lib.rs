@@ -65,7 +65,7 @@ pub use types::{FromSql, Oid, ToSql};
 
 // Re-export derive macros when the `derive` feature is enabled
 #[cfg(feature = "derive")]
-pub use sentinel_driver_derive::{FromRow, FromSql, ToSql};
+pub use sentinel_derive::{FromRow, FromSql, ToSql};
 
 use bytes::BytesMut;
 
