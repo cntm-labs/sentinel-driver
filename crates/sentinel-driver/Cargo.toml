@@ -1,0 +1,55 @@
+[package]
+name = "sentinel-driver"
+version = "0.1.0"
+edition = "2021"
+description = "High-performance PostgreSQL wire protocol driver for Rust"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/cntm-labs/sentinel-driver"
+homepage = "https://github.com/cntm-labs/sentinel-driver"
+keywords = ["postgresql", "database", "driver", "async", "tokio"]
+categories = ["database"]
+readme = "../../README.md"
+rust-version = "1.75"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1", features = ["net", "io-util", "time", "sync", "rt", "macros"] }
+
+# Zero-copy buffers
+bytes = "1"
+
+# TLS
+rustls = "0.23"
+webpki-roots = "0.26"
+tokio-rustls = "0.26"
+rustls-pki-types = "1"
+
+# Crypto (SCRAM-SHA-256)
+sha2 = "0.10"
+hmac = "0.12"
+stringprep = "0.1"
+base64 = "0.22"
+rand = "0.8"
+
+# Common PG types
+chrono = { version = "0.4", default-features = false, features = ["std"] }
+uuid = "1"
+
+# Error handling
+thiserror = "2"
+
+# Logging
+tracing = "0.1"
+
+# LRU cache for prepared statements
+lru = "0.12"
+
+# Derive macros
+sentinel-derive = { path = "../sentinel-derive", optional = true }
+
+[features]
+default = ["derive"]
+derive = ["dep:sentinel-derive"]
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full"] }
