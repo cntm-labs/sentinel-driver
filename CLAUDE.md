@@ -38,19 +38,40 @@ sentinel-driver/
 │   ├── row.rs              # Row type (zero-copy column access)
 │   ├── statement.rs        # Prepared statement
 │   └── transaction.rs      # Transaction wrapper
+├── tests/
+│   ├── core/               # Unit-level integration tests (no PG required)
+│   ├── postgres/           # Live PG integration tests (DATABASE_URL required)
+│   ├── docker-compose.yml  # PG 13/16/17 for local testing
+│   ├── fixtures/           # Test data files
+│   └── certs/              # TLS test certificates
 ├── derive/                  # FromRow, ToSql, FromSql proc macros
 │   └── src/
+├── .github/
+│   ├── workflows/          # CI: lint, test, pg-matrix, coverage, release
+│   ├── ISSUE_TEMPLATE/     # Bug report, feature request, docs
+│   └── pull_request_template.md
+├── .githooks/
+│   └── pre-commit          # fmt + clippy + test
 ├── docs/
 │   └── plans/
-└── Cargo.toml
+├── clippy.toml             # Clippy config (disallowed methods, thresholds)
+├── rustfmt.toml            # Format config (edition 2021, max_width 100)
+├── .editorconfig           # Editor config
+└── Cargo.toml              # Workspace with [lints] config
 ```
 
 ## Build Commands
 ```sh
 cargo check                      # Type check
-cargo test                       # Run tests
-cargo clippy -- -D warnings      # Lint
+cargo test --workspace           # Run all tests
+cargo clippy --workspace -- -D warnings  # Lint
 cargo fmt --all                  # Format
+cargo fmt --all -- --check       # Check formatting (CI)
+```
+
+## Git Hooks
+```sh
+git config core.hooksPath .githooks   # Enable pre-commit hook
 ```
 
 ## Design Principles
@@ -83,6 +104,14 @@ cargo fmt --all                  # Format
 - Binary format for all PG types by default
 - Every public API must be documented
 - 100% test coverage target
+
+## Lint Policy
+Workspace lints defined in `Cargo.toml` `[workspace.lints.clippy]`:
+- **forbid**: `unwrap_used`, `dbg_macro`, `todo`, `unimplemented`, `print_stdout/stderr`, `mem_forget`, `exit`, `unsafe_code`
+- **deny**: `expect_used` (use `#[allow(clippy::expect_used)]` with justification), `large_enum_variant`, `needless_pass_by_value`
+- **warn**: pedantic group (with select allows for noise reduction)
+
+Use `expect("reason")` with `#[allow(clippy::expect_used)]` for infallible operations (constant dates, known-valid inputs).
 
 ## Dependencies (minimal)
 - tokio, bytes, rustls, webpki-roots

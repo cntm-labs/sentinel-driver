@@ -167,9 +167,6 @@ impl Connection {
                 BackendMessage::CommandComplete { tag } => {
                     results.push(row::parse_command_tag(&tag));
                 }
-                BackendMessage::RowDescription { .. }
-                | BackendMessage::DataRow { .. }
-                | BackendMessage::EmptyQueryResponse => {}
                 BackendMessage::ReadyForQuery { transaction_status } => {
                     self.transaction_status = transaction_status;
                     break;
@@ -186,7 +183,7 @@ impl Connection {
                         fields.position,
                     ));
                 }
-                _ => continue,
+                _ => {}
             }
         }
 
@@ -348,7 +345,7 @@ impl Connection {
 
     /// Register a prepared statement in the Tier 1 cache.
     pub fn register_statement(&mut self, name: &str, statement: Statement) {
-        self.stmt_cache.register(name.to_string(), statement);
+        self.stmt_cache.register(name, statement);
     }
 
     /// Get statement cache metrics.
@@ -413,12 +410,9 @@ impl Connection {
 
     async fn drain_until_ready(&mut self) -> Result<()> {
         loop {
-            match self.conn.recv().await? {
-                BackendMessage::ReadyForQuery { transaction_status } => {
-                    self.transaction_status = transaction_status;
-                    return Ok(());
-                }
-                _ => continue,
+            if let BackendMessage::ReadyForQuery { transaction_status } = self.conn.recv().await? {
+                self.transaction_status = transaction_status;
+                return Ok(());
             }
         }
     }

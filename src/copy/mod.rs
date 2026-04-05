@@ -71,7 +71,7 @@ impl<'a> CopyIn<'a> {
                         fields.position,
                     ));
                 }
-                _ => continue,
+                _ => {}
             }
         };
 
@@ -95,7 +95,7 @@ impl<'a> CopyIn<'a> {
     }
 }
 
-impl<'a> Drop for CopyIn<'a> {
+impl Drop for CopyIn<'_> {
     fn drop(&mut self) {
         if !self.finished {
             // Can't do async in drop — just write CopyFail to buffer.
@@ -163,7 +163,7 @@ impl<'a> CopyOut<'a> {
                         fields.position,
                     ));
                 }
-                _ => continue,
+                _ => {}
             }
         }
     }
@@ -196,7 +196,7 @@ pub(crate) async fn start_copy_in(
                     fields.position,
                 ));
             }
-            _ => continue,
+            _ => {}
         }
     }
 }
@@ -222,7 +222,7 @@ pub(crate) async fn start_copy_out(conn: &mut PgConnection, sql: &str) -> Result
                     fields.position,
                 ));
             }
-            _ => continue,
+            _ => {}
         }
     }
 }
@@ -230,9 +230,8 @@ pub(crate) async fn start_copy_out(conn: &mut PgConnection, sql: &str) -> Result
 /// Drain messages until ReadyForQuery.
 async fn drain_until_ready(conn: &mut PgConnection) -> Result<()> {
     loop {
-        match conn.recv().await? {
-            BackendMessage::ReadyForQuery { .. } => return Ok(()),
-            _ => continue,
+        if let BackendMessage::ReadyForQuery { .. } = conn.recv().await? {
+            return Ok(());
         }
     }
 }

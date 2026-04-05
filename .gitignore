@@ -1,2 +1,8 @@
 /target
 Cargo.lock
+.worktrees/
+.env
+.vscode/
+.idea/
+*.vim
+*.vi

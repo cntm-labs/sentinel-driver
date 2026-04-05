@@ -30,10 +30,8 @@ pub(crate) async fn listen(conn: &mut PgConnection, channel: &str) -> Result<()>
     // Expect CommandComplete + ReadyForQuery
     loop {
         match conn.recv().await? {
-            BackendMessage::CommandComplete { .. } => {}
             BackendMessage::ReadyForQuery { .. } => return Ok(()),
             BackendMessage::ErrorResponse { fields } => {
-                // Drain until ReadyForQuery
                 drain_until_ready(conn).await.ok();
                 return Err(Error::server(
                     fields.severity,
@@ -44,7 +42,7 @@ pub(crate) async fn listen(conn: &mut PgConnection, channel: &str) -> Result<()>
                     fields.position,
                 ));
             }
-            _ => continue,
+            _ => {}
         }
     }
 }
@@ -59,7 +57,6 @@ pub(crate) async fn unlisten(conn: &mut PgConnection, channel: &str) -> Result<(
 
     loop {
         match conn.recv().await? {
-            BackendMessage::CommandComplete { .. } => {}
             BackendMessage::ReadyForQuery { .. } => return Ok(()),
             BackendMessage::ErrorResponse { fields } => {
                 drain_until_ready(conn).await.ok();
@@ -72,7 +69,7 @@ pub(crate) async fn unlisten(conn: &mut PgConnection, channel: &str) -> Result<(
                     fields.position,
                 ));
             }
-            _ => continue,
+            _ => {}
         }
     }
 }
@@ -84,7 +81,6 @@ pub(crate) async fn unlisten_all(conn: &mut PgConnection) -> Result<()> {
 
     loop {
         match conn.recv().await? {
-            BackendMessage::CommandComplete { .. } => {}
             BackendMessage::ReadyForQuery { .. } => return Ok(()),
             BackendMessage::ErrorResponse { fields } => {
                 drain_until_ready(conn).await.ok();
@@ -97,7 +93,7 @@ pub(crate) async fn unlisten_all(conn: &mut PgConnection) -> Result<()> {
                     fields.position,
                 ));
             }
-            _ => continue,
+            _ => {}
         }
     }
 }
@@ -117,9 +113,6 @@ pub(crate) async fn notify(conn: &mut PgConnection, channel: &str, payload: &str
 
     loop {
         match conn.recv().await? {
-            BackendMessage::CommandComplete { .. }
-            | BackendMessage::DataRow { .. }
-            | BackendMessage::RowDescription { .. } => {}
             BackendMessage::ReadyForQuery { .. } => return Ok(()),
             BackendMessage::ErrorResponse { fields } => {
                 drain_until_ready(conn).await.ok();
@@ -132,7 +125,7 @@ pub(crate) async fn notify(conn: &mut PgConnection, channel: &str, payload: &str
                     fields.position,
                 ));
             }
-            _ => continue,
+            _ => {}
         }
     }
 }
@@ -165,11 +158,7 @@ pub(crate) async fn wait_for_notification(conn: &mut PgConnection) -> Result<Not
                     fields.position,
                 ));
             }
-            // Silently consume keepalive/status messages
-            BackendMessage::ParameterStatus { .. } | BackendMessage::NoticeResponse { .. } => {
-                continue
-            }
-            _ => continue,
+            _ => {}
         }
     }
 }
@@ -199,9 +188,8 @@ fn quote_literal(val: &str) -> String {
 
 async fn drain_until_ready(conn: &mut PgConnection) -> Result<()> {
     loop {
-        match conn.recv().await? {
-            BackendMessage::ReadyForQuery { .. } => return Ok(()),
-            _ => continue,
+        if let BackendMessage::ReadyForQuery { .. } = conn.recv().await? {
+            return Ok(());
         }
     }
 }

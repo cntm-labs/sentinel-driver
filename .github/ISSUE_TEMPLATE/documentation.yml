@@ -1,0 +1,16 @@
+name: Documentation
+description: Report a documentation issue or suggest an improvement
+labels: ["documentation"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What documentation is missing, incorrect, or could be improved?
+    validations:
+      required: true
+  - type: input
+    id: location
+    attributes:
+      label: Location
+      description: Where is the issue? (URL, file path, or section name)

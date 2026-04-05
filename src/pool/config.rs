@@ -93,9 +93,7 @@ impl PoolConfig {
 }
 
 fn num_cpus() -> usize {
-    std::thread::available_parallelism()
-        .map(|n| n.get() * 2)
-        .unwrap_or(8)
+    std::thread::available_parallelism().map_or(8, |n| n.get() * 2)
 }
 
 #[cfg(test)]
