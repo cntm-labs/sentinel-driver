@@ -35,6 +35,7 @@
 
 pub mod auth;
 pub mod cache;
+pub mod cancel;
 pub mod config;
 pub mod connection;
 pub mod copy;
@@ -52,6 +53,7 @@ pub mod types;
 // ── Public re-exports ────────────────────────────────
 
 pub use cache::{CacheMetrics, StatementCache};
+pub use cancel::CancelToken;
 pub use config::{Config, SslMode};
 pub use copy::binary::{BinaryCopyDecoder, BinaryCopyEncoder};
 pub use copy::text::{TextCopyDecoder, TextCopyEncoder};
