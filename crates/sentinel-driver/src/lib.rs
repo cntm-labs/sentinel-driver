@@ -83,9 +83,9 @@ use crate::protocol::frontend;
 /// convenient query methods, and transaction support.
 pub struct Connection {
     conn: PgConnection,
-    _config: Config,
+    config: Config,
     process_id: i32,
-    _secret_key: i32,
+    secret_key: i32,
     transaction_status: TransactionStatus,
     stmt_cache: StatementCache,
 }
@@ -98,9 +98,9 @@ impl Connection {
 
         Ok(Self {
             conn,
-            _config: config,
+            config,
             process_id: result.process_id,
-            _secret_key: result.secret_key,
+            secret_key: result.secret_key,
             transaction_status: result.transaction_status,
             stmt_cache: StatementCache::new(),
         })
@@ -363,6 +363,19 @@ impl Connection {
     /// The server process ID for this connection.
     pub fn process_id(&self) -> i32 {
         self.process_id
+    }
+
+    /// Get a cancel token for this connection.
+    ///
+    /// The token can be cloned and sent to another task to cancel a
+    /// running query. See [`CancelToken`] for details.
+    pub fn cancel_token(&self) -> CancelToken {
+        CancelToken::new(
+            self.config.host(),
+            self.config.port(),
+            self.process_id,
+            self.secret_key,
+        )
     }
 
     /// Current transaction status.
