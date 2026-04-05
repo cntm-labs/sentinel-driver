@@ -1,0 +1,7 @@
+enhancement:
+  - changed-files:
+      - any-glob-to-any-file: 'crates/*/src/**'
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file: ['docs/**', '*.md']
