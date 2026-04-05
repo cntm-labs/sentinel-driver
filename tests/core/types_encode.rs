@@ -123,6 +123,73 @@ fn test_encode_vec_bool() {
 }
 
 #[test]
+fn test_encode_vec_str_ref() {
+    use sentinel_driver::types::Oid;
+
+    let v: Vec<&str> = vec!["hello", "world"];
+    let mut buf = BytesMut::new();
+    v.to_sql(&mut buf).unwrap();
+    assert_eq!(v.oid(), Oid::TEXT_ARRAY);
+
+    // Verify header
+    let ndim = i32::from_be_bytes(buf[0..4].try_into().unwrap());
+    assert_eq!(ndim, 1);
+    let dim_len = i32::from_be_bytes(buf[12..16].try_into().unwrap());
+    assert_eq!(dim_len, 2);
+}
+
+#[test]
+fn test_encode_vec_i16() {
+    use sentinel_driver::types::Oid;
+
+    let v: Vec<i16> = vec![1, -1, 0];
+    let mut buf = BytesMut::new();
+    v.to_sql(&mut buf).unwrap();
+    assert_eq!(v.oid(), Oid::INT2_ARRAY);
+}
+
+#[test]
+fn test_encode_vec_i64() {
+    use sentinel_driver::types::Oid;
+
+    let v: Vec<i64> = vec![1, i64::MAX];
+    let mut buf = BytesMut::new();
+    v.to_sql(&mut buf).unwrap();
+    assert_eq!(v.oid(), Oid::INT8_ARRAY);
+}
+
+#[test]
+fn test_encode_vec_f32() {
+    use sentinel_driver::types::Oid;
+
+    let v: Vec<f32> = vec![1.0, 3.14, -0.5];
+    let mut buf = BytesMut::new();
+    v.to_sql(&mut buf).unwrap();
+    assert_eq!(v.oid(), Oid::FLOAT4_ARRAY);
+}
+
+#[test]
+fn test_encode_vec_f64() {
+    use sentinel_driver::types::Oid;
+
+    let v: Vec<f64> = vec![std::f64::consts::PI, 0.0];
+    let mut buf = BytesMut::new();
+    v.to_sql(&mut buf).unwrap();
+    assert_eq!(v.oid(), Oid::FLOAT8_ARRAY);
+}
+
+#[test]
+fn test_encode_vec_uuid() {
+    use sentinel_driver::types::Oid;
+
+    let id = uuid::Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap();
+    let v: Vec<uuid::Uuid> = vec![id, uuid::Uuid::nil()];
+    let mut buf = BytesMut::new();
+    v.to_sql(&mut buf).unwrap();
+    assert_eq!(v.oid(), Oid::UUID_ARRAY);
+}
+
+#[test]
 fn test_encode_naive_date() {
     // 2000-01-01 should encode as 0
     let date = chrono::NaiveDate::from_ymd_opt(2000, 1, 1).unwrap();

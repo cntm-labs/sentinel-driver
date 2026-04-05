@@ -189,6 +189,95 @@ fn test_decode_array_multidim_rejected() {
 }
 
 #[test]
+fn test_decode_array_header_too_short() {
+    // Less than 12 bytes
+    let buf = [0u8; 8];
+    let result = Vec::<i32>::from_sql(&buf);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_decode_array_wrong_element_oid() {
+    use sentinel_driver::types::Oid;
+
+    let mut buf = BytesMut::new();
+    buf.put_i32(1); // ndim = 1
+    buf.put_i32(0); // has_null = 0
+    buf.put_u32(Oid::TEXT.0); // wrong OID for Vec<i32>
+    buf.put_i32(1); // dim_len = 1
+    buf.put_i32(1); // dim_lbound = 1
+    buf.put_i32(4); // elem_len = 4
+    buf.put_i32(42); // element data
+
+    let result = Vec::<i32>::from_sql(&buf);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_decode_array_dimension_header_too_short() {
+    use sentinel_driver::types::Oid;
+
+    // 12 bytes header but missing dimension info (need 20 for ndim=1)
+    let mut buf = BytesMut::new();
+    buf.put_i32(1); // ndim = 1
+    buf.put_i32(0); // has_null = 0
+    buf.put_u32(Oid::INT4.0);
+    // Missing dim_len and dim_lbound
+
+    let result = Vec::<i32>::from_sql(&buf);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_decode_array_element_data_truncated() {
+    use sentinel_driver::types::Oid;
+
+    let mut buf = BytesMut::new();
+    buf.put_i32(1); // ndim = 1
+    buf.put_i32(0); // has_null = 0
+    buf.put_u32(Oid::INT4.0);
+    buf.put_i32(1); // dim_len = 1
+    buf.put_i32(1); // dim_lbound = 1
+    buf.put_i32(4); // elem_len = 4
+    buf.put_i16(0); // only 2 bytes instead of 4
+
+    let result = Vec::<i32>::from_sql(&buf);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_decode_array_null_element_rejected() {
+    use sentinel_driver::types::Oid;
+
+    let mut buf = BytesMut::new();
+    buf.put_i32(1); // ndim = 1
+    buf.put_i32(1); // has_null = 1
+    buf.put_u32(Oid::INT4.0);
+    buf.put_i32(1); // dim_len = 1
+    buf.put_i32(1); // dim_lbound = 1
+    buf.put_i32(-1); // NULL element (len = -1)
+
+    let result = Vec::<i32>::from_sql(&buf);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_decode_array_unexpected_end_of_data() {
+    use sentinel_driver::types::Oid;
+
+    let mut buf = BytesMut::new();
+    buf.put_i32(1); // ndim = 1
+    buf.put_i32(0); // has_null = 0
+    buf.put_u32(Oid::INT4.0);
+    buf.put_i32(2); // dim_len = 2 (claims 2 elements)
+    buf.put_i32(1); // dim_lbound = 1
+                    // No element data at all
+
+    let result = Vec::<i32>::from_sql(&buf);
+    assert!(result.is_err());
+}
+
+#[test]
 fn test_option_from_sql() {
     let result: Option<i32> = FromSql::from_sql_nullable(None).unwrap();
     assert_eq!(result, None);
