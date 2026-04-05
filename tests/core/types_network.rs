@@ -121,10 +121,80 @@ fn test_cidr_roundtrip() {
 }
 
 #[test]
-fn test_ipaddr_convenience() {
+fn test_ipaddr_convenience_v4() {
     let val = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
     let mut buf = BytesMut::new();
     val.to_sql(&mut buf).ok();
     let decoded = IpAddr::from_sql(&buf).ok();
     assert_eq!(decoded, Some(val));
+}
+
+#[test]
+fn test_ipaddr_convenience_v6() {
+    let val = IpAddr::V6(Ipv6Addr::LOCALHOST);
+    let mut buf = BytesMut::new();
+    val.to_sql(&mut buf).ok();
+    assert_eq!(buf.len(), 20);
+    let decoded = IpAddr::from_sql(&buf).ok();
+    assert_eq!(decoded, Some(val));
+}
+
+#[test]
+fn test_cidr_ipv6_roundtrip() {
+    use sentinel_driver::types::network::PgCidr;
+    let val = PgCidr {
+        addr: IpAddr::V6(Ipv6Addr::new(0x2001, 0xdb8, 0, 0, 0, 0, 0, 0)),
+        netmask: 32,
+    };
+    let mut buf = BytesMut::new();
+    val.to_sql(&mut buf).ok();
+    assert_eq!(buf[0], 3); // AF_INET6
+    assert_eq!(buf[2], 1); // is_cidr = true
+    let decoded = PgCidr::from_sql(&buf).ok();
+    assert_eq!(decoded, Some(val));
+}
+
+#[test]
+fn test_macaddr_wrong_size() {
+    use sentinel_driver::types::network::PgMacAddr;
+    assert!(PgMacAddr::from_sql(&[0u8; 5]).is_err());
+    assert!(PgMacAddr::from_sql(&[0u8; 7]).is_err());
+}
+
+#[test]
+fn test_inet_address_truncated() {
+    // Valid header but truncated address data
+    let buf = [2, 32, 0, 4, 192, 168]; // AF_INET, mask=32, not_cidr, len=4, but only 2 addr bytes
+    assert!(PgInet::from_sql(&buf).is_err());
+}
+
+#[test]
+fn test_inet_ipv4_wrong_addr_len() {
+    // AF_INET but addr_len=16 (should be 4)
+    let mut buf = vec![2, 32, 0, 16];
+    buf.extend_from_slice(&[0u8; 16]);
+    assert!(PgInet::from_sql(&buf).is_err());
+}
+
+#[test]
+fn test_inet_ipv6_wrong_addr_len() {
+    // AF_INET6 but addr_len=4 (should be 16)
+    let buf = [3, 128, 0, 4, 0, 0, 0, 1];
+    assert!(PgInet::from_sql(&buf).is_err());
+}
+
+#[test]
+fn test_cidr_oid() {
+    use sentinel_driver::types::network::PgCidr;
+    let val = PgCidr {
+        addr: IpAddr::V4(Ipv4Addr::LOCALHOST),
+        netmask: 32,
+    };
+    assert_eq!(val.oid(), Oid::CIDR);
+}
+
+#[test]
+fn test_macaddr_oid() {
+    use sentinel_driver::types::network::PgMacAddr;
+    assert_eq!(PgMacAddr([0; 6]).oid(), Oid::MACADDR);
 }
