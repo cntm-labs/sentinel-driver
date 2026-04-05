@@ -11,17 +11,17 @@ use crate::protocol::frontend;
 /// Cost: ~50us round-trip.
 pub(crate) async fn check_alive(conn: &mut PgConnection) -> bool {
     frontend::query(conn.write_buf(), "");
+    try_check_alive(conn).await.unwrap_or(false)
+}
 
-    if conn.send().await.is_err() {
-        return false;
-    }
+/// Inner function that uses `?` for unified error handling.
+async fn try_check_alive(conn: &mut PgConnection) -> crate::error::Result<bool> {
+    conn.send().await?;
 
     // Drain until ReadyForQuery
     loop {
-        match conn.recv().await {
-            Ok(BackendMessage::ReadyForQuery { .. }) => return true,
-            Ok(_) => {}
-            Err(_) => return false,
+        if matches!(conn.recv().await?, BackendMessage::ReadyForQuery { .. }) {
+            return Ok(true);
         }
     }
 }
