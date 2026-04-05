@@ -278,6 +278,20 @@ fn test_decode_array_unexpected_end_of_data() {
 }
 
 #[test]
+fn test_array_from_sql_oid() {
+    use sentinel_driver::types::Oid;
+
+    assert_eq!(<Vec<bool> as FromSql>::oid(), Oid::BOOL_ARRAY);
+    assert_eq!(<Vec<i16> as FromSql>::oid(), Oid::INT2_ARRAY);
+    assert_eq!(<Vec<i32> as FromSql>::oid(), Oid::INT4_ARRAY);
+    assert_eq!(<Vec<i64> as FromSql>::oid(), Oid::INT8_ARRAY);
+    assert_eq!(<Vec<f32> as FromSql>::oid(), Oid::FLOAT4_ARRAY);
+    assert_eq!(<Vec<f64> as FromSql>::oid(), Oid::FLOAT8_ARRAY);
+    assert_eq!(<Vec<String> as FromSql>::oid(), Oid::TEXT_ARRAY);
+    assert_eq!(<Vec<uuid::Uuid> as FromSql>::oid(), Oid::UUID_ARRAY);
+}
+
+#[test]
 fn test_option_from_sql() {
     let result: Option<i32> = FromSql::from_sql_nullable(None).unwrap();
     assert_eq!(result, None);
