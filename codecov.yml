@@ -1,0 +1,20 @@
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 1%
+    patch:
+      default:
+        target: 100%
+
+ignore:
+  - "derive/"
+  - "tests/"
+  - "src/connection/"
+  - "src/tls/"
+  - "src/lib.rs"
+  - "src/copy/mod.rs"
+  - "src/notify/mod.rs"
+  - "src/pool/mod.rs"
+  - "src/pipeline/mod.rs"
