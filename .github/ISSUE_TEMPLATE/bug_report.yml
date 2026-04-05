@@ -2,6 +2,34 @@ name: Bug Report
 description: Report a bug in sentinel-driver
 labels: ["bug"]
 body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which part of the driver is affected?
+      options:
+        - Connection (TCP/TLS, startup, handshake)
+        - Pool (connection pool, health checks)
+        - Protocol (wire protocol, messages)
+        - Types (encode/decode, PG types)
+        - Pipeline (query batching)
+        - Copy (COPY IN/OUT)
+        - Notify (LISTEN/NOTIFY)
+        - Auth (SCRAM, MD5)
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Severity
+      description: How severe is this bug?
+      options:
+        - High — crash, data loss, or security issue
+        - Medium — incorrect behavior with workaround
+        - Low — minor or cosmetic issue
+    validations:
+      required: true
   - type: textarea
     id: description
     attributes:
