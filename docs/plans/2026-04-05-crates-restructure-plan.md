@@ -150,7 +150,7 @@ members = [
 ]
 
 [workspace.lints.rust]
-unsafe_code = "allow"
+unsafe_code = "forbid"
 dead_code = "deny"
 unused_imports = "deny"
 
@@ -164,7 +164,7 @@ dbg_macro = "deny"
 todo = "warn"
 ```
 
-Note: `unsafe_code = "allow"` (not "forbid") because sentinel-driver uses minimal unsafe for zero-copy parsing per CLAUDE.md conventions.
+Note: `unsafe_code = "forbid"` — zero-copy parsing uses `bytes::Bytes` safe API, no unsafe needed in driver code.
 
 **Step 2: Verify compilation**
 

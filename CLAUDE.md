@@ -103,8 +103,7 @@ git config core.hooksPath .githooks   # Enable pre-commit hook
 - Connection pool (deadpool-style, <0.5 μs checkout)
 
 ## Conventions
-- Minimal unsafe — only where required for zero-copy parsing
-- All unsafe must have SAFETY comment explaining invariant
+- No unsafe code — zero-copy via `bytes::Bytes` safe API (unsafe_code = "forbid")
 - Binary format for all PG types by default
 - Every public API must be documented
 - 100% test coverage target
