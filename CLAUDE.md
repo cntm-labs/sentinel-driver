@@ -15,37 +15,33 @@ Can be used independently as a standalone PG driver crate.
 ## Project Structure
 ```
 sentinel-driver/
-├── src/
-│   ├── lib.rs              # Public API
-│   ├── config.rs           # Connection configuration
-│   ├── error.rs            # Error types
-│   ├── protocol/
-│   │   ├── frontend.rs     # Client-to-server messages
-│   │   ├── backend.rs      # Server-to-client messages
-│   │   └── codec.rs        # Encoder/decoder (zero-copy)
-│   ├── connection/
-│   │   ├── stream.rs       # TCP/TLS stream
-│   │   └── startup.rs      # Handshake + auth
-│   ├── auth/
-│   │   ├── scram.rs        # SCRAM-SHA-256 (correct SASLprep)
-│   │   └── md5.rs          # MD5 (legacy)
-│   ├── pool/               # Connection pool (<0.5 μs checkout)
-│   ├── pipeline/           # PG pipeline mode (auto-batch)
-│   ├── copy/               # COPY IN/OUT (binary + text)
-│   ├── notify/             # LISTEN/NOTIFY engine
-│   ├── types/              # PG type encode/decode (binary format)
-│   ├── tls/                # rustls integration
-│   ├── row.rs              # Row type (zero-copy column access)
-│   ├── statement.rs        # Prepared statement
-│   └── transaction.rs      # Transaction wrapper
+├── crates/
+│   ├── sentinel-driver/        # Main driver crate
+│   │   └── src/
+│   │       ├── lib.rs          # Public API
+│   │       ├── config.rs       # Connection configuration
+│   │       ├── error.rs        # Error types
+│   │       ├── protocol/       # PG wire protocol
+│   │       ├── connection/     # TCP/TLS + handshake
+│   │       ├── auth/           # SCRAM-SHA-256, MD5
+│   │       ├── pool/           # Connection pool
+│   │       ├── pipeline/       # PG pipeline mode
+│   │       ├── copy/           # COPY IN/OUT
+│   │       ├── notify/         # LISTEN/NOTIFY
+│   │       ├── types/          # PG type encode/decode
+│   │       ├── tls/            # rustls integration
+│   │       ├── row.rs          # Row type
+│   │       ├── statement.rs    # Prepared statement
+│   │       └── transaction.rs  # Transaction wrapper
+│   └── sentinel-derive/        # Derive macros crate
+│       └── src/
+│           └── lib.rs          # FromRow, ToSql, FromSql
 ├── tests/
 │   ├── core/               # Unit-level integration tests (no PG required)
 │   ├── postgres/           # Live PG integration tests (DATABASE_URL required)
 │   ├── docker-compose.yml  # PG 13/16/17 for local testing
 │   ├── fixtures/           # Test data files
 │   └── certs/              # TLS test certificates
-├── derive/                  # FromRow, ToSql, FromSql proc macros
-│   └── src/
 ├── .github/
 │   ├── workflows/          # CI: lint, test, pg-matrix, coverage, release
 │   ├── ISSUE_TEMPLATE/     # Bug report, feature request, docs
@@ -57,7 +53,8 @@ sentinel-driver/
 ├── clippy.toml             # Clippy config (disallowed methods, thresholds)
 ├── rustfmt.toml            # Format config (edition 2021, max_width 100)
 ├── .editorconfig           # Editor config
-└── Cargo.toml              # Workspace with [lints] config
+├── Cargo.toml              # Workspace root (no package)
+└── Cargo.lock
 ```
 
 ## Build Commands
