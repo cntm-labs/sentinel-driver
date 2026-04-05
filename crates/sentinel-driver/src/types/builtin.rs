@@ -114,4 +114,19 @@ static BUILTIN_TYPES: &[TypeInfo] = &[
         name: "interval",
         array_oid: Some(Oid::INTERVAL_ARRAY),
     },
+    TypeInfo {
+        oid: Oid::INET,
+        name: "inet",
+        array_oid: Some(Oid::INET_ARRAY),
+    },
+    TypeInfo {
+        oid: Oid::CIDR,
+        name: "cidr",
+        array_oid: Some(Oid::CIDR_ARRAY),
+    },
+    TypeInfo {
+        oid: Oid::MACADDR,
+        name: "macaddr",
+        array_oid: Some(Oid::MACADDR_ARRAY),
+    },
 ];

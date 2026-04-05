@@ -2,6 +2,7 @@ pub mod builtin;
 pub mod decode;
 pub mod encode;
 pub mod interval;
+pub mod network;
 
 use crate::error::Result;
 use bytes::BytesMut;
@@ -31,6 +32,12 @@ impl Oid {
     pub const UUID: Oid = Oid(2950);
     pub const JSONB: Oid = Oid(3802);
     pub const JSON: Oid = Oid(114);
+    pub const INET: Oid = Oid(869);
+    pub const CIDR: Oid = Oid(650);
+    pub const INET_ARRAY: Oid = Oid(1041);
+    pub const CIDR_ARRAY: Oid = Oid(651);
+    pub const MACADDR: Oid = Oid(829);
+    pub const MACADDR_ARRAY: Oid = Oid(1040);
     pub const INTERVAL: Oid = Oid(1186);
     pub const INTERVAL_ARRAY: Oid = Oid(1187);
 
