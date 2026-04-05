@@ -1,4 +1,4 @@
-use bytes::BytesMut;
+use bytes::{BufMut, BytesMut};
 
 use sentinel_driver::types::{FromSql, ToSql};
 
@@ -62,8 +62,8 @@ fn test_roundtrip_string() {
 
 #[test]
 fn test_roundtrip_bytes() {
-    roundtrip(&vec![0xDE, 0xAD, 0xBE, 0xEF]);
-    roundtrip(&vec![]);
+    roundtrip(&vec![0xDE_u8, 0xAD, 0xBE, 0xEF]);
+    roundtrip(&Vec::<u8>::new());
 }
 
 #[test]
@@ -123,6 +123,69 @@ fn test_decode_wrong_size() {
     assert!(i32::from_sql(&[0, 0]).is_err());
     assert!(bool::from_sql(&[]).is_err());
     assert!(uuid::Uuid::from_sql(&[0; 15]).is_err());
+}
+
+#[test]
+fn test_roundtrip_vec_i32() {
+    roundtrip(&vec![1i32, 2, 3]);
+    roundtrip(&vec![i32::MIN, 0, i32::MAX]);
+}
+
+#[test]
+fn test_roundtrip_vec_empty_i32() {
+    roundtrip(&Vec::<i32>::new());
+}
+
+#[test]
+fn test_roundtrip_vec_i16() {
+    roundtrip(&vec![1i16, -1, 0]);
+}
+
+#[test]
+fn test_roundtrip_vec_i64() {
+    roundtrip(&vec![1i64, i64::MAX]);
+}
+
+#[test]
+fn test_roundtrip_vec_f32() {
+    roundtrip(&vec![1.0f32, 3.14, -0.5]);
+}
+
+#[test]
+fn test_roundtrip_vec_f64() {
+    roundtrip(&vec![std::f64::consts::PI, 0.0]);
+}
+
+#[test]
+fn test_roundtrip_vec_bool() {
+    roundtrip(&vec![true, false, true]);
+}
+
+#[test]
+fn test_roundtrip_vec_string() {
+    roundtrip(&vec![String::from("hello"), String::from("world")]);
+    roundtrip(&vec![String::from("")]);
+}
+
+#[test]
+fn test_roundtrip_vec_uuid() {
+    let id = uuid::Uuid::parse_str("550e8400-e29b-41d4-a716-446655440000").unwrap();
+    roundtrip(&vec![id, uuid::Uuid::nil()]);
+}
+
+#[test]
+fn test_decode_array_multidim_rejected() {
+    let mut buf = BytesMut::new();
+    buf.put_i32(2); // ndim = 2 (not supported)
+    buf.put_i32(0);
+    buf.put_u32(sentinel_driver::types::Oid::INT4.0);
+    buf.put_i32(2);
+    buf.put_i32(1);
+    buf.put_i32(2);
+    buf.put_i32(1);
+
+    let result = Vec::<i32>::from_sql(&buf);
+    assert!(result.is_err());
 }
 
 #[test]
