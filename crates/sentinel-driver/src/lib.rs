@@ -124,6 +124,10 @@ impl Connection {
     /// # }
     /// ```
     pub async fn query(&mut self, sql: &str, params: &[&(dyn ToSql + Sync)]) -> Result<Vec<Row>> {
+        if let Some(timeout) = self.query_timeout {
+            return self.query_with_timeout(sql, params, timeout).await;
+        }
+
         let result = self.query_internal(sql, params).await?;
         match result {
             pipeline::QueryResult::Rows(rows) => Ok(rows),
@@ -155,6 +159,10 @@ impl Connection {
     ///
     /// Returns the number of rows affected.
     pub async fn execute(&mut self, sql: &str, params: &[&(dyn ToSql + Sync)]) -> Result<u64> {
+        if let Some(timeout) = self.query_timeout {
+            return self.execute_with_timeout(sql, params, timeout).await;
+        }
+
         let result = self.query_internal(sql, params).await?;
         match result {
             pipeline::QueryResult::Command(r) => Ok(r.rows_affected),
@@ -174,8 +182,14 @@ impl Connection {
     ) -> Result<Vec<Row>> {
         let cancel_token = self.cancel_token();
 
-        match tokio::time::timeout(timeout, self.query(sql, params)).await {
-            Ok(result) => result,
+        match tokio::time::timeout(timeout, self.query_internal(sql, params)).await {
+            Ok(result) => {
+                let result = result?;
+                match result {
+                    pipeline::QueryResult::Rows(rows) => Ok(rows),
+                    pipeline::QueryResult::Command(_) => Ok(Vec::new()),
+                }
+            }
             Err(_elapsed) => {
                 self.is_broken = true;
                 // Fire-and-forget cancel
@@ -202,8 +216,14 @@ impl Connection {
     ) -> Result<u64> {
         let cancel_token = self.cancel_token();
 
-        match tokio::time::timeout(timeout, self.execute(sql, params)).await {
-            Ok(result) => result,
+        match tokio::time::timeout(timeout, self.query_internal(sql, params)).await {
+            Ok(result) => {
+                let result = result?;
+                match result {
+                    pipeline::QueryResult::Command(r) => Ok(r.rows_affected),
+                    pipeline::QueryResult::Rows(_) => Ok(0),
+                }
+            }
             Err(_elapsed) => {
                 self.is_broken = true;
                 tokio::spawn(async move {
