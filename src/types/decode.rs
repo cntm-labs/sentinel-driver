@@ -153,7 +153,8 @@ impl FromSql for chrono::NaiveDate {
 
     fn from_sql(buf: &[u8]) -> Result<Self> {
         let days = i32::from_sql(buf)?;
-        let epoch = chrono::NaiveDate::from_ymd_opt(2000, 1, 1).unwrap();
+        #[allow(clippy::expect_used)]
+        let epoch = chrono::NaiveDate::from_ymd_opt(2000, 1, 1).expect("PG epoch is valid");
         epoch
             .checked_add_signed(chrono::Duration::days(days as i64))
             .ok_or_else(|| Error::Decode(format!("date out of range: {days} days from epoch")))

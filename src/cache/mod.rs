@@ -72,9 +72,7 @@ impl StatementCache {
     pub fn with_capacity(lru_capacity: usize) -> Self {
         Self {
             registered: HashMap::new(),
-            adhoc: LruCache::new(
-                NonZeroUsize::new(lru_capacity).unwrap_or(NonZeroUsize::new(1).unwrap()),
-            ),
+            adhoc: LruCache::new(NonZeroUsize::new(lru_capacity).unwrap_or(NonZeroUsize::MIN)),
             name_counter: AtomicU64::new(0),
             metrics: CacheMetrics::default(),
         }
@@ -83,11 +81,11 @@ impl StatementCache {
     /// Register a statement in Tier 1 (permanent, never evicted).
     ///
     /// The `name` is the user-defined name (also used as the server-side name).
-    pub fn register(&mut self, name: String, statement: Statement) {
+    pub fn register(&mut self, name: &str, statement: Statement) {
         self.registered.insert(
-            name.clone(),
+            name.to_string(),
             CachedStatement {
-                name: name.clone(),
+                name: name.to_string(),
                 statement,
             },
         );
@@ -193,10 +191,7 @@ mod tests {
     fn test_register_and_lookup() {
         let mut cache = StatementCache::new();
 
-        cache.register(
-            "find_user".to_string(),
-            make_stmt("SELECT * FROM users WHERE id = $1"),
-        );
+        cache.register("find_user", make_stmt("SELECT * FROM users WHERE id = $1"));
 
         let cached = cache.get_registered("find_user").unwrap();
         assert_eq!(cached.statement.sql(), "SELECT * FROM users WHERE id = $1");
@@ -243,7 +238,7 @@ mod tests {
         let mut cache = StatementCache::new();
 
         // Register a statement
-        cache.register("s1".to_string(), make_stmt("SELECT 1"));
+        cache.register("s1", make_stmt("SELECT 1"));
 
         // Tier 1 hit
         cache.get_registered("s1");
@@ -286,8 +281,8 @@ mod tests {
     fn test_counts() {
         let mut cache = StatementCache::new();
 
-        cache.register("s1".to_string(), make_stmt("SELECT 1"));
-        cache.register("s2".to_string(), make_stmt("SELECT 2"));
+        cache.register("s1", make_stmt("SELECT 1"));
+        cache.register("s2", make_stmt("SELECT 2"));
         assert_eq!(cache.registered_count(), 2);
 
         cache.insert_adhoc("SELECT 3".to_string(), make_stmt("SELECT 3"));

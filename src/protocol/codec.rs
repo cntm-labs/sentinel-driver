@@ -16,7 +16,7 @@ pub fn decode_message(buf: &mut BytesMut) -> Result<Option<BackendMessage>> {
     }
 
     let msg_type = buf[0];
-    let body_len = i32::from_be_bytes(buf[1..5].try_into().unwrap());
+    let body_len = i32::from_be_bytes([buf[1], buf[2], buf[3], buf[4]]);
 
     if body_len < 4 {
         return Err(Error::protocol(format!(

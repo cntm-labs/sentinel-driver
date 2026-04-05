@@ -210,7 +210,8 @@ fn hi(password: &[u8], salt: &[u8], iterations: u32) -> Vec<u8> {
 }
 
 fn hmac_sha256(key: &[u8], data: &[u8]) -> Vec<u8> {
-    let mut mac = HmacSha256::new_from_slice(key).expect("HMAC can accept any key length");
+    #[allow(clippy::expect_used)]
+    let mut mac = HmacSha256::new_from_slice(key).expect("HMAC accepts any key length");
     mac.update(data);
     mac.finalize().into_bytes().to_vec()
 }
@@ -227,7 +228,7 @@ fn sha256(data: &[u8]) -> Vec<u8> {
 /// authentication failures with non-ASCII passwords.
 fn saslprep(input: &str) -> Result<String> {
     stringprep::saslprep(input)
-        .map(|s| s.into_owned())
+        .map(std::borrow::Cow::into_owned)
         .map_err(|e| Error::Auth(format!("SASLprep failed: {e}")))
 }
 

@@ -12,7 +12,7 @@ impl ToSql for bool {
     }
 
     fn to_sql(&self, buf: &mut BytesMut) -> Result<()> {
-        buf.put_u8(if *self { 1 } else { 0 });
+        buf.put_u8(u8::from(*self));
         Ok(())
     }
 }
@@ -156,7 +156,8 @@ impl ToSql for chrono::NaiveDate {
     }
 
     fn to_sql(&self, buf: &mut BytesMut) -> Result<()> {
-        let epoch = chrono::NaiveDate::from_ymd_opt(2000, 1, 1).unwrap();
+        #[allow(clippy::expect_used)]
+        let epoch = chrono::NaiveDate::from_ymd_opt(2000, 1, 1).expect("PG epoch is valid");
         let days = (*self - epoch).num_days() as i32;
         buf.put_i32(days);
         Ok(())
@@ -168,9 +169,11 @@ impl ToSql for chrono::NaiveTime {
         Oid::TIME
     }
 
+    #[allow(clippy::expect_used)]
     fn to_sql(&self, buf: &mut BytesMut) -> Result<()> {
+        let midnight = chrono::NaiveTime::from_hms_opt(0, 0, 0).expect("midnight is valid");
         let us = self
-            .signed_duration_since(chrono::NaiveTime::from_hms_opt(0, 0, 0).unwrap())
+            .signed_duration_since(midnight)
             .num_microseconds()
             .unwrap_or(0);
         buf.put_i64(us);

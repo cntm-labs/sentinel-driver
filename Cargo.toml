@@ -9,6 +9,9 @@ description = "High-performance PostgreSQL wire protocol driver for Rust"
 license = "MIT OR Apache-2.0"
 rust-version = "1.75"
 
+[lints]
+workspace = true
+
 [dependencies]
 # Async runtime
 tokio = { version = "1", features = ["net", "io-util", "time", "sync", "rt", "macros"] }
@@ -51,5 +54,46 @@ derive = ["dep:sentinel-driver-derive"]
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }
+
+[workspace.lints.clippy]
+# FORBID — cannot be #[allow]'d
+unwrap_used = "forbid"
+dbg_macro = "forbid"
+todo = "forbid"
+unimplemented = "forbid"
+print_stdout = "forbid"
+print_stderr = "forbid"
+mem_forget = "forbid"
+exit = "forbid"
+# DENY — strict but #[expect()] allowed with justification
+expect_used = "deny"
+large_enum_variant = "deny"
+result_large_err = "deny"
+needless_pass_by_value = "deny"
+redundant_closure_for_method_calls = "deny"
+manual_let_else = "deny"
+cloned_instead_of_copied = "deny"
+implicit_clone = "deny"
+# WARN — pedantic
+pedantic = { level = "warn", priority = -1 }
+module_name_repetitions = "allow"
+# Pedantic allows — tighten incrementally
+must_use_candidate = "allow"
+return_self_not_must_use = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+doc_markdown = "allow"
+unreadable_literal = "allow"
+cast_possible_truncation = "allow"
+cast_sign_loss = "allow"
+cast_possible_wrap = "allow"
+cast_precision_loss = "allow"
+cast_lossless = "allow"
+items_after_statements = "allow"
+redundant_else = "allow"
+many_single_char_names = "allow"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
 
 [workspace.dependencies]

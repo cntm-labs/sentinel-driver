@@ -21,8 +21,11 @@ pub(crate) fn make_tls_connector(ssl_mode: SslMode, host: &str) -> Result<Option
                 .with_no_client_auth();
 
             let connector = TlsConnector::from(Arc::new(config));
-            let server_name = ServerName::try_from(host.to_string())
-                .unwrap_or_else(|_| ServerName::try_from("localhost".to_string()).unwrap());
+            #[allow(clippy::expect_used)]
+            let server_name = ServerName::try_from(host.to_string()).unwrap_or_else(|_| {
+                ServerName::try_from("localhost".to_string())
+                    .expect("localhost is a valid server name")
+            });
 
             Ok(Some(TlsConfig {
                 connector,

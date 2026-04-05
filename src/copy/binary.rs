@@ -196,11 +196,16 @@ impl<'a> BinaryCopyDecoder<'a> {
 }
 
 fn read_i32(buf: &[u8], offset: usize) -> i32 {
-    i32::from_be_bytes(buf[offset..offset + 4].try_into().unwrap())
+    i32::from_be_bytes([
+        buf[offset],
+        buf[offset + 1],
+        buf[offset + 2],
+        buf[offset + 3],
+    ])
 }
 
 fn read_i16(buf: &[u8], offset: usize) -> i16 {
-    i16::from_be_bytes(buf[offset..offset + 2].try_into().unwrap())
+    i16::from_be_bytes([buf[offset], buf[offset + 1]])
 }
 
 #[cfg(test)]

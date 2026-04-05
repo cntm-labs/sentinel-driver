@@ -182,7 +182,8 @@ mod tests {
             if pos + 5 > buf.len() {
                 break;
             }
-            let len = i32::from_be_bytes(buf[pos + 1..pos + 5].try_into().unwrap()) as usize;
+            let len = i32::from_be_bytes([buf[pos + 1], buf[pos + 2], buf[pos + 3], buf[pos + 4]])
+                as usize;
             pos += 1 + len; // type byte + declared length (which includes its own 4 bytes)
         }
 

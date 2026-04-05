@@ -101,27 +101,17 @@ impl Pool {
             state.idle.pop_front()
         };
 
-        match idle_conn {
-            Some(idle) => {
-                if self.is_healthy(&idle.meta) {
-                    debug!("reusing idle connection");
-                    Ok(PooledConnection {
-                        conn: Some(idle.conn),
-                        meta: idle.meta,
-                        shared: Arc::clone(&self.shared),
-                    })
-                } else {
-                    debug!("idle connection unhealthy, creating new one");
-                    self.decrement_count().await;
-                    let (conn, meta) = self.create_connection().await?;
-                    Ok(PooledConnection {
-                        conn: Some(conn),
-                        meta,
-                        shared: Arc::clone(&self.shared),
-                    })
-                }
-            }
-            None => {
+        if let Some(idle) = idle_conn {
+            if self.is_healthy(&idle.meta) {
+                debug!("reusing idle connection");
+                Ok(PooledConnection {
+                    conn: Some(idle.conn),
+                    meta: idle.meta,
+                    shared: Arc::clone(&self.shared),
+                })
+            } else {
+                debug!("idle connection unhealthy, creating new one");
+                self.decrement_count().await;
                 let (conn, meta) = self.create_connection().await?;
                 Ok(PooledConnection {
                     conn: Some(conn),
@@ -129,6 +119,13 @@ impl Pool {
                     shared: Arc::clone(&self.shared),
                 })
             }
+        } else {
+            let (conn, meta) = self.create_connection().await?;
+            Ok(PooledConnection {
+                conn: Some(conn),
+                meta,
+                shared: Arc::clone(&self.shared),
+            })
         }
     }
 

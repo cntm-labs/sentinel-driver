@@ -93,7 +93,6 @@ impl NotificationReceiver {
                 Ok(notification) => return Some(notification),
                 Err(broadcast::error::RecvError::Lagged(n)) => {
                     tracing::warn!(count = n, "notification receiver lagged, skipped messages");
-                    continue;
                 }
                 Err(broadcast::error::RecvError::Closed) => return None,
             }

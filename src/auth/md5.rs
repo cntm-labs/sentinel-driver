@@ -80,7 +80,12 @@ fn md5_compute(input: &[u8]) -> [u8; 16] {
     for chunk in msg.chunks_exact(64) {
         let mut m = [0u32; 16];
         for (i, word) in m.iter_mut().enumerate() {
-            *word = u32::from_le_bytes(chunk[i * 4..i * 4 + 4].try_into().unwrap());
+            *word = u32::from_le_bytes([
+                chunk[i * 4],
+                chunk[i * 4 + 1],
+                chunk[i * 4 + 2],
+                chunk[i * 4 + 3],
+            ]);
         }
 
         let (mut a, mut b, mut c, mut d) = (a0, b0, c0, d0);
@@ -115,7 +120,13 @@ fn md5_compute(input: &[u8]) -> [u8; 16] {
 }
 
 fn hex_encode(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| format!("{b:02x}")).collect()
+    use std::fmt::Write;
+    bytes
+        .iter()
+        .fold(String::with_capacity(bytes.len() * 2), |mut s, b| {
+            let _ = write!(s, "{b:02x}");
+            s
+        })
 }
 
 #[cfg(test)]

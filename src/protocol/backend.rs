@@ -179,27 +179,27 @@ impl DataRowColumns {
 /// `msg_type` is the first byte, `body` is the payload (after the length).
 pub fn decode(msg_type: u8, body: Bytes) -> Result<BackendMessage> {
     match msg_type {
-        b'R' => decode_auth(body),
-        b'K' => decode_backend_key_data(body),
-        b'S' => decode_parameter_status(body),
-        b'Z' => decode_ready_for_query(body),
-        b'T' => decode_row_description(body),
+        b'R' => decode_auth(&body),
+        b'K' => decode_backend_key_data(&body),
+        b'S' => decode_parameter_status(&body),
+        b'Z' => decode_ready_for_query(&body),
+        b'T' => decode_row_description(&body),
         b'D' => decode_data_row(body),
-        b'C' => decode_command_complete(body),
+        b'C' => decode_command_complete(&body),
         b'I' => Ok(BackendMessage::EmptyQueryResponse),
-        b'E' => decode_error_response(body),
-        b'N' => decode_notice_response(body),
+        b'E' => decode_error_response(&body),
+        b'N' => decode_notice_response(&body),
         b'1' => Ok(BackendMessage::ParseComplete),
         b'2' => Ok(BackendMessage::BindComplete),
         b'3' => Ok(BackendMessage::CloseComplete),
         b'n' => Ok(BackendMessage::NoData),
         b's' => Ok(BackendMessage::PortalSuspended),
-        b't' => decode_parameter_description(body),
-        b'G' => decode_copy_in_response(body),
-        b'H' => decode_copy_out_response(body),
+        b't' => decode_parameter_description(&body),
+        b'G' => decode_copy_in_response(&body),
+        b'H' => decode_copy_out_response(&body),
         b'd' => Ok(BackendMessage::CopyData { data: body }),
         b'c' => Ok(BackendMessage::CopyDone),
-        b'A' => decode_notification(body),
+        b'A' => decode_notification(&body),
         _ => Err(Error::protocol(format!(
             "unknown message type: 0x{msg_type:02x}"
         ))),
@@ -208,11 +208,11 @@ pub fn decode(msg_type: u8, body: Bytes) -> Result<BackendMessage> {
 
 // ── Decoders ─────────────────────────────────────────
 
-fn decode_auth(body: Bytes) -> Result<BackendMessage> {
+fn decode_auth(body: &[u8]) -> Result<BackendMessage> {
     if body.len() < 4 {
         return Err(Error::protocol("auth message too short"));
     }
-    let auth_type = read_i32(&body, 0);
+    let auth_type = read_i32(body, 0);
 
     match auth_type {
         0 => Ok(BackendMessage::AuthenticationOk),
@@ -233,7 +233,7 @@ fn decode_auth(body: Bytes) -> Result<BackendMessage> {
                 if pos >= body.len() {
                     break;
                 }
-                let s = read_cstr(&body, &mut pos)?;
+                let s = read_cstr(body, &mut pos)?;
                 if s.is_empty() {
                     break;
                 }
@@ -253,24 +253,24 @@ fn decode_auth(body: Bytes) -> Result<BackendMessage> {
     }
 }
 
-fn decode_backend_key_data(body: Bytes) -> Result<BackendMessage> {
+fn decode_backend_key_data(body: &[u8]) -> Result<BackendMessage> {
     if body.len() < 8 {
         return Err(Error::protocol("BackendKeyData too short"));
     }
     Ok(BackendMessage::BackendKeyData {
-        process_id: read_i32(&body, 0),
-        secret_key: read_i32(&body, 4),
+        process_id: read_i32(body, 0),
+        secret_key: read_i32(body, 4),
     })
 }
 
-fn decode_parameter_status(body: Bytes) -> Result<BackendMessage> {
+fn decode_parameter_status(body: &[u8]) -> Result<BackendMessage> {
     let mut pos = 0;
-    let name = read_cstr(&body, &mut pos)?;
-    let value = read_cstr(&body, &mut pos)?;
+    let name = read_cstr(body, &mut pos)?;
+    let value = read_cstr(body, &mut pos)?;
     Ok(BackendMessage::ParameterStatus { name, value })
 }
 
-fn decode_ready_for_query(body: Bytes) -> Result<BackendMessage> {
+fn decode_ready_for_query(body: &[u8]) -> Result<BackendMessage> {
     if body.is_empty() {
         return Err(Error::protocol("ReadyForQuery empty"));
     }
@@ -285,27 +285,27 @@ fn decode_ready_for_query(body: Bytes) -> Result<BackendMessage> {
     })
 }
 
-fn decode_row_description(body: Bytes) -> Result<BackendMessage> {
+fn decode_row_description(body: &[u8]) -> Result<BackendMessage> {
     if body.len() < 2 {
         return Err(Error::protocol("RowDescription too short"));
     }
-    let field_count = read_i16(&body, 0) as usize;
+    let field_count = read_i16(body, 0) as usize;
     let mut fields = Vec::with_capacity(field_count);
     let mut pos = 2;
 
     for _ in 0..field_count {
-        let name = read_cstr(&body, &mut pos)?;
+        let name = read_cstr(body, &mut pos)?;
 
         if pos + 18 > body.len() {
             return Err(Error::protocol("RowDescription field truncated"));
         }
 
-        let table_oid = read_u32(&body, pos);
-        let column_id = read_i16(&body, pos + 4);
-        let type_oid = read_u32(&body, pos + 6);
-        let type_size = read_i16(&body, pos + 10);
-        let type_modifier = read_i32(&body, pos + 12);
-        let format = read_i16(&body, pos + 16);
+        let table_oid = read_u32(body, pos);
+        let column_id = read_i16(body, pos + 4);
+        let type_oid = read_u32(body, pos + 6);
+        let type_size = read_i16(body, pos + 10);
+        let type_modifier = read_i32(body, pos + 12);
+        let format = read_i16(body, pos + 16);
         pos += 18;
 
         fields.push(FieldDescription {
@@ -354,13 +354,13 @@ fn decode_data_row(body: Bytes) -> Result<BackendMessage> {
     })
 }
 
-fn decode_command_complete(body: Bytes) -> Result<BackendMessage> {
+fn decode_command_complete(body: &[u8]) -> Result<BackendMessage> {
     let mut pos = 0;
-    let tag = read_cstr(&body, &mut pos)?;
+    let tag = read_cstr(body, &mut pos)?;
     Ok(BackendMessage::CommandComplete { tag })
 }
 
-fn decode_error_notice_fields(body: &Bytes) -> Result<ErrorFields> {
+fn decode_error_notice_fields(body: &[u8]) -> Result<ErrorFields> {
     let mut severity = String::new();
     let mut code = String::new();
     let mut message = String::new();
@@ -434,21 +434,21 @@ fn decode_error_notice_fields(body: &Bytes) -> Result<ErrorFields> {
     })
 }
 
-fn decode_error_response(body: Bytes) -> Result<BackendMessage> {
-    let fields = decode_error_notice_fields(&body)?;
+fn decode_error_response(body: &[u8]) -> Result<BackendMessage> {
+    let fields = decode_error_notice_fields(body)?;
     Ok(BackendMessage::ErrorResponse { fields })
 }
 
-fn decode_notice_response(body: Bytes) -> Result<BackendMessage> {
-    let fields = decode_error_notice_fields(&body)?;
+fn decode_notice_response(body: &[u8]) -> Result<BackendMessage> {
+    let fields = decode_error_notice_fields(body)?;
     Ok(BackendMessage::NoticeResponse { fields })
 }
 
-fn decode_parameter_description(body: Bytes) -> Result<BackendMessage> {
+fn decode_parameter_description(body: &[u8]) -> Result<BackendMessage> {
     if body.len() < 2 {
         return Err(Error::protocol("ParameterDescription too short"));
     }
-    let count = read_i16(&body, 0) as usize;
+    let count = read_i16(body, 0) as usize;
     let mut oids = Vec::with_capacity(count);
     let mut pos = 2;
 
@@ -456,14 +456,14 @@ fn decode_parameter_description(body: Bytes) -> Result<BackendMessage> {
         if pos + 4 > body.len() {
             return Err(Error::protocol("ParameterDescription truncated"));
         }
-        oids.push(read_u32(&body, pos));
+        oids.push(read_u32(body, pos));
         pos += 4;
     }
 
     Ok(BackendMessage::ParameterDescription { oids })
 }
 
-fn decode_copy_response(body: &Bytes) -> Result<(CopyFormat, Vec<i16>)> {
+fn decode_copy_response(body: &[u8]) -> Result<(CopyFormat, Vec<i16>)> {
     if body.len() < 3 {
         return Err(Error::protocol("CopyResponse too short"));
     }
@@ -487,30 +487,30 @@ fn decode_copy_response(body: &Bytes) -> Result<(CopyFormat, Vec<i16>)> {
     Ok((format, column_formats))
 }
 
-fn decode_copy_in_response(body: Bytes) -> Result<BackendMessage> {
-    let (format, column_formats) = decode_copy_response(&body)?;
+fn decode_copy_in_response(body: &[u8]) -> Result<BackendMessage> {
+    let (format, column_formats) = decode_copy_response(body)?;
     Ok(BackendMessage::CopyInResponse {
         format,
         column_formats,
     })
 }
 
-fn decode_copy_out_response(body: Bytes) -> Result<BackendMessage> {
-    let (format, column_formats) = decode_copy_response(&body)?;
+fn decode_copy_out_response(body: &[u8]) -> Result<BackendMessage> {
+    let (format, column_formats) = decode_copy_response(body)?;
     Ok(BackendMessage::CopyOutResponse {
         format,
         column_formats,
     })
 }
 
-fn decode_notification(body: Bytes) -> Result<BackendMessage> {
+fn decode_notification(body: &[u8]) -> Result<BackendMessage> {
     if body.len() < 4 {
         return Err(Error::protocol("NotificationResponse too short"));
     }
-    let process_id = read_i32(&body, 0);
+    let process_id = read_i32(body, 0);
     let mut pos = 4;
-    let channel = read_cstr(&body, &mut pos)?;
-    let payload = read_cstr(&body, &mut pos)?;
+    let channel = read_cstr(body, &mut pos)?;
+    let payload = read_cstr(body, &mut pos)?;
 
     Ok(BackendMessage::NotificationResponse {
         process_id,
@@ -522,15 +522,25 @@ fn decode_notification(body: Bytes) -> Result<BackendMessage> {
 // ── Read helpers ─────────────────────────────────────
 
 fn read_i32(buf: &[u8], offset: usize) -> i32 {
-    i32::from_be_bytes(buf[offset..offset + 4].try_into().unwrap())
+    i32::from_be_bytes([
+        buf[offset],
+        buf[offset + 1],
+        buf[offset + 2],
+        buf[offset + 3],
+    ])
 }
 
 fn read_u32(buf: &[u8], offset: usize) -> u32 {
-    u32::from_be_bytes(buf[offset..offset + 4].try_into().unwrap())
+    u32::from_be_bytes([
+        buf[offset],
+        buf[offset + 1],
+        buf[offset + 2],
+        buf[offset + 3],
+    ])
 }
 
 fn read_i16(buf: &[u8], offset: usize) -> i16 {
-    i16::from_be_bytes(buf[offset..offset + 2].try_into().unwrap())
+    i16::from_be_bytes([buf[offset], buf[offset + 1]])
 }
 
 /// Read a null-terminated string starting at `pos`, advancing `pos` past the null.

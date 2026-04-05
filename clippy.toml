@@ -1,0 +1,8 @@
+disallowed-methods = [
+    { path = "core::cmp::Ord::min", reason = "ambiguous — use std::cmp::min(a, b) instead" },
+    { path = "core::cmp::Ord::max", reason = "ambiguous — use std::cmp::max(a, b) instead" },
+]
+
+cognitive-complexity-threshold = 30
+too-many-lines-threshold = 150
+too-large-for-stack = 256
