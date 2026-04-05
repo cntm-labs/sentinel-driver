@@ -1,0 +1,52 @@
+name: PostgreSQL Integration
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -Dwarnings
+
+jobs:
+  postgresql:
+    name: PostgreSQL ${{ matrix.pg-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        pg-version: [13, 16, 17]
+    services:
+      postgres:
+        image: postgres:${{ matrix.pg-version }}
+        env:
+          POSTGRES_USER: sentinel
+          POSTGRES_PASSWORD: sentinel_test
+          POSTGRES_DB: sentinel_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgres://sentinel:sentinel_test@localhost:5432/sentinel_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Verify PostgreSQL is reachable
+        run: |
+          sudo apt-get install -y -qq postgresql-client > /dev/null
+          pg_isready -h localhost -p 5432 -U sentinel
+          psql "$DATABASE_URL" -c "SELECT version();"
+
+      - name: Run setup SQL
+        run: psql "$DATABASE_URL" -f tests/postgres/setup.sql
+
+      - name: Run tests with live PostgreSQL
+        run: cargo test --workspace
