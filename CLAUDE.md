@@ -21,16 +21,23 @@ sentinel-driver/
 │   │       ├── lib.rs          # Public API
 │   │       ├── config.rs       # Connection configuration
 │   │       ├── error.rs        # Error types
-│   │       ├── protocol/       # PG wire protocol
-│   │       ├── connection/     # TCP/TLS + handshake
-│   │       ├── auth/           # SCRAM-SHA-256, MD5
-│   │       ├── pool/           # Connection pool
-│   │       ├── pipeline/       # PG pipeline mode
-│   │       ├── copy/           # COPY IN/OUT
-│   │       ├── notify/         # LISTEN/NOTIFY
-│   │       ├── types/          # PG type encode/decode
+│   │       ├── protocol/
+│   │       │   ├── frontend.rs # Client-to-server messages
+│   │       │   ├── backend.rs  # Server-to-client messages
+│   │       │   └── codec.rs    # Encoder/decoder (zero-copy)
+│   │       ├── connection/
+│   │       │   ├── stream.rs   # TCP/TLS stream
+│   │       │   └── startup.rs  # Handshake + auth
+│   │       ├── auth/
+│   │       │   ├── scram.rs    # SCRAM-SHA-256 (correct SASLprep)
+│   │       │   └── md5.rs      # MD5 (legacy)
+│   │       ├── pool/           # Connection pool (<0.5 μs checkout)
+│   │       ├── pipeline/       # PG pipeline mode (auto-batch)
+│   │       ├── copy/           # COPY IN/OUT (binary + text)
+│   │       ├── notify/         # LISTEN/NOTIFY engine
+│   │       ├── types/          # PG type encode/decode (binary format)
 │   │       ├── tls/            # rustls integration
-│   │       ├── row.rs          # Row type
+│   │       ├── row.rs          # Row type (zero-copy column access)
 │   │       ├── statement.rs    # Prepared statement
 │   │       └── transaction.rs  # Transaction wrapper
 │   └── sentinel-derive/        # Derive macros crate

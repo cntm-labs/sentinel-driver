@@ -45,7 +45,7 @@ tracing = "0.1"
 lru = "0.12"
 
 # Derive macros
-sentinel-derive = { path = "../sentinel-derive", optional = true }
+sentinel-derive = { version = "0.1.0", path = "../sentinel-derive", optional = true }
 
 [features]
 default = ["derive"]
