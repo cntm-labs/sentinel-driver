@@ -11,6 +11,7 @@ mod protocol_frontend;
 mod row;
 mod statement;
 mod transaction;
+mod types_bit;
 mod types_builtin;
 mod types_decode;
 mod types_encode;

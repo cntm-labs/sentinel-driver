@@ -204,4 +204,14 @@ static BUILTIN_TYPES: &[TypeInfo] = &[
         name: "pg_lsn",
         array_oid: Some(Oid::PG_LSN_ARRAY),
     },
+    TypeInfo {
+        oid: Oid::BIT,
+        name: "bit",
+        array_oid: Some(Oid::BIT_ARRAY),
+    },
+    TypeInfo {
+        oid: Oid::VARBIT,
+        name: "varbit",
+        array_oid: Some(Oid::VARBIT_ARRAY),
+    },
 ];

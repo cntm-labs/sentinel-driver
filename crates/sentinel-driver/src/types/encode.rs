@@ -271,6 +271,7 @@ impl_array_to_sql!(
 );
 #[cfg(feature = "with-rust-decimal")]
 impl_array_to_sql!(rust_decimal::Decimal, Oid::NUMERIC_ARRAY, Oid::NUMERIC);
+impl_array_to_sql!(crate::types::bit::PgBit, Oid::VARBIT_ARRAY, Oid::VARBIT);
 
 impl ToSql for Vec<&str> {
     fn oid(&self) -> Oid {

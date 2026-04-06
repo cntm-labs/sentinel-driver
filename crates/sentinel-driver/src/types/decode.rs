@@ -314,3 +314,4 @@ impl_array_from_sql!(
 );
 #[cfg(feature = "with-rust-decimal")]
 impl_array_from_sql!(rust_decimal::Decimal, Oid::NUMERIC_ARRAY, Oid::NUMERIC);
+impl_array_from_sql!(crate::types::bit::PgBit, Oid::VARBIT_ARRAY, Oid::VARBIT);

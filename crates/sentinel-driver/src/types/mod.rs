@@ -1,3 +1,4 @@
+pub mod bit;
 pub mod builtin;
 pub mod decode;
 pub mod encode;
@@ -74,6 +75,10 @@ impl Oid {
     pub const XML_ARRAY: Oid = Oid(143);
     pub const PG_LSN: Oid = Oid(3220);
     pub const PG_LSN_ARRAY: Oid = Oid(3221);
+    pub const BIT: Oid = Oid(1560);
+    pub const BIT_ARRAY: Oid = Oid(1561);
+    pub const VARBIT: Oid = Oid(1562);
+    pub const VARBIT_ARRAY: Oid = Oid(1563);
 
     // Array types
     pub const BOOL_ARRAY: Oid = Oid(1000);
