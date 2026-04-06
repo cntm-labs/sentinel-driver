@@ -1,3 +1,4 @@
+mod auth;
 mod cache;
 mod cancel;
 mod config;
