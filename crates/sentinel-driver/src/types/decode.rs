@@ -297,3 +297,20 @@ impl_array_from_sql!(f32, Oid::FLOAT4_ARRAY, Oid::FLOAT4);
 impl_array_from_sql!(f64, Oid::FLOAT8_ARRAY, Oid::FLOAT8);
 impl_array_from_sql!(String, Oid::TEXT_ARRAY, Oid::TEXT);
 impl_array_from_sql!(uuid::Uuid, Oid::UUID_ARRAY, Oid::UUID);
+impl_array_from_sql!(
+    crate::types::interval::PgInterval,
+    Oid::INTERVAL_ARRAY,
+    Oid::INTERVAL
+);
+impl_array_from_sql!(crate::types::money::PgMoney, Oid::MONEY_ARRAY, Oid::MONEY);
+impl_array_from_sql!(crate::types::xml::PgXml, Oid::XML_ARRAY, Oid::XML);
+impl_array_from_sql!(crate::types::lsn::PgLsn, Oid::PG_LSN_ARRAY, Oid::PG_LSN);
+impl_array_from_sql!(crate::types::network::PgInet, Oid::INET_ARRAY, Oid::INET);
+impl_array_from_sql!(crate::types::network::PgCidr, Oid::CIDR_ARRAY, Oid::CIDR);
+impl_array_from_sql!(
+    crate::types::network::PgMacAddr,
+    Oid::MACADDR_ARRAY,
+    Oid::MACADDR
+);
+#[cfg(feature = "with-rust-decimal")]
+impl_array_from_sql!(rust_decimal::Decimal, Oid::NUMERIC_ARRAY, Oid::NUMERIC);

@@ -109,4 +109,99 @@ static BUILTIN_TYPES: &[TypeInfo] = &[
         name: "jsonb",
         array_oid: None,
     },
+    TypeInfo {
+        oid: Oid::INTERVAL,
+        name: "interval",
+        array_oid: Some(Oid::INTERVAL_ARRAY),
+    },
+    TypeInfo {
+        oid: Oid::INET,
+        name: "inet",
+        array_oid: Some(Oid::INET_ARRAY),
+    },
+    TypeInfo {
+        oid: Oid::CIDR,
+        name: "cidr",
+        array_oid: Some(Oid::CIDR_ARRAY),
+    },
+    TypeInfo {
+        oid: Oid::MACADDR,
+        name: "macaddr",
+        array_oid: Some(Oid::MACADDR_ARRAY),
+    },
+    TypeInfo {
+        oid: Oid::NUMERIC,
+        name: "numeric",
+        array_oid: Some(Oid::NUMERIC_ARRAY),
+    },
+    TypeInfo {
+        oid: Oid::INT4RANGE,
+        name: "int4range",
+        array_oid: Some(Oid::INT4RANGE_ARRAY),
+    },
+    TypeInfo {
+        oid: Oid::INT8RANGE,
+        name: "int8range",
+        array_oid: Some(Oid::INT8RANGE_ARRAY),
+    },
+    TypeInfo {
+        oid: Oid::NUMRANGE,
+        name: "numrange",
+        array_oid: Some(Oid::NUMRANGE_ARRAY),
+    },
+    TypeInfo {
+        oid: Oid::TSRANGE,
+        name: "tsrange",
+        array_oid: Some(Oid::TSRANGE_ARRAY),
+    },
+    TypeInfo {
+        oid: Oid::TSTZRANGE,
+        name: "tstzrange",
+        array_oid: Some(Oid::TSTZRANGE_ARRAY),
+    },
+    TypeInfo {
+        oid: Oid::DATERANGE,
+        name: "daterange",
+        array_oid: Some(Oid::DATERANGE_ARRAY),
+    },
+    TypeInfo {
+        oid: Oid::MONEY,
+        name: "money",
+        array_oid: Some(Oid::MONEY_ARRAY),
+    },
+    TypeInfo {
+        oid: Oid::POINT,
+        name: "point",
+        array_oid: None,
+    },
+    TypeInfo {
+        oid: Oid::LINE,
+        name: "line",
+        array_oid: None,
+    },
+    TypeInfo {
+        oid: Oid::LSEG,
+        name: "lseg",
+        array_oid: None,
+    },
+    TypeInfo {
+        oid: Oid::PG_BOX,
+        name: "box",
+        array_oid: None,
+    },
+    TypeInfo {
+        oid: Oid::CIRCLE,
+        name: "circle",
+        array_oid: None,
+    },
+    TypeInfo {
+        oid: Oid::XML,
+        name: "xml",
+        array_oid: Some(Oid::XML_ARRAY),
+    },
+    TypeInfo {
+        oid: Oid::PG_LSN,
+        name: "pg_lsn",
+        array_oid: Some(Oid::PG_LSN_ARRAY),
+    },
 ];

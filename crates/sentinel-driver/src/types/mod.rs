@@ -1,6 +1,15 @@
 pub mod builtin;
 pub mod decode;
 pub mod encode;
+pub mod geometric;
+pub mod interval;
+pub mod lsn;
+pub mod money;
+pub mod network;
+#[cfg(feature = "with-rust-decimal")]
+pub mod numeric;
+pub mod range;
+pub mod xml;
 
 use crate::error::Result;
 use bytes::BytesMut;
@@ -30,6 +39,41 @@ impl Oid {
     pub const UUID: Oid = Oid(2950);
     pub const JSONB: Oid = Oid(3802);
     pub const JSON: Oid = Oid(114);
+    pub const INET: Oid = Oid(869);
+    pub const CIDR: Oid = Oid(650);
+    pub const INET_ARRAY: Oid = Oid(1041);
+    pub const CIDR_ARRAY: Oid = Oid(651);
+    pub const MACADDR: Oid = Oid(829);
+    pub const MACADDR_ARRAY: Oid = Oid(1040);
+    pub const INTERVAL: Oid = Oid(1186);
+    pub const INTERVAL_ARRAY: Oid = Oid(1187);
+    pub const NUMERIC: Oid = Oid(1700);
+    pub const NUMERIC_ARRAY: Oid = Oid(1231);
+    pub const INT4RANGE: Oid = Oid(3904);
+    pub const INT8RANGE: Oid = Oid(3926);
+    pub const NUMRANGE: Oid = Oid(3906);
+    pub const TSRANGE: Oid = Oid(3908);
+    pub const TSTZRANGE: Oid = Oid(3910);
+    pub const DATERANGE: Oid = Oid(3912);
+    pub const INT4RANGE_ARRAY: Oid = Oid(3905);
+    pub const INT8RANGE_ARRAY: Oid = Oid(3927);
+    pub const NUMRANGE_ARRAY: Oid = Oid(3907);
+    pub const TSRANGE_ARRAY: Oid = Oid(3909);
+    pub const TSTZRANGE_ARRAY: Oid = Oid(3911);
+    pub const DATERANGE_ARRAY: Oid = Oid(3913);
+    pub const MONEY: Oid = Oid(790);
+    pub const MONEY_ARRAY: Oid = Oid(791);
+    pub const POINT: Oid = Oid(600);
+    pub const LINE: Oid = Oid(628);
+    pub const LSEG: Oid = Oid(601);
+    pub const PG_BOX: Oid = Oid(603);
+    pub const PATH: Oid = Oid(602);
+    pub const POLYGON: Oid = Oid(604);
+    pub const CIRCLE: Oid = Oid(718);
+    pub const XML: Oid = Oid(142);
+    pub const XML_ARRAY: Oid = Oid(143);
+    pub const PG_LSN: Oid = Oid(3220);
+    pub const PG_LSN_ARRAY: Oid = Oid(3221);
 
     // Array types
     pub const BOOL_ARRAY: Oid = Oid(1000);
