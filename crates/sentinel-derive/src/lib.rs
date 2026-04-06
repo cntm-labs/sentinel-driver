@@ -58,10 +58,20 @@ fn impl_from_row(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
 
     let field_extractions = fields.iter().map(|f| {
         let field_name = f.ident.as_ref().unwrap();
+        let field_ty = &f.ty;
         let column_name = field_name.to_string();
 
-        // Per-field rename takes precedence over rename_all
-        let col = get_rename_attr(f).unwrap_or_else(|| {
+        let attrs = parse_field_attrs(f).unwrap();
+
+        // #[sentinel(skip)] — always use Default::default()
+        if attrs.skip {
+            return quote! {
+                #field_name: ::std::default::Default::default()
+            };
+        }
+
+        // Determine column name
+        let col = attrs.rename.unwrap_or_else(|| {
             if let Some(ref strategy) = rename_all {
                 apply_rename_all(&column_name, strategy)
             } else {
@@ -69,6 +79,39 @@ fn impl_from_row(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
             }
         });
 
+        // #[sentinel(try_from = "SourceType")]
+        if let Some(ref source_ty) = attrs.try_from {
+            if attrs.default {
+                return quote! {
+                    #field_name: match row.try_get_by_name::<#source_ty>(#col) {
+                        Ok(v) => <#field_ty as ::std::convert::TryFrom<#source_ty>>::try_from(v)
+                            .map_err(|e| sentinel_driver::Error::Decode(format!("{}", e)))?,
+                        Err(sentinel_driver::Error::ColumnNotFound(_)) => ::std::default::Default::default(),
+                        Err(e) => return Err(e),
+                    }
+                };
+            }
+            return quote! {
+                #field_name: {
+                    let v = row.try_get_by_name::<#source_ty>(#col)?;
+                    <#field_ty as ::std::convert::TryFrom<#source_ty>>::try_from(v)
+                        .map_err(|e| sentinel_driver::Error::Decode(format!("{}", e)))?
+                }
+            };
+        }
+
+        // #[sentinel(default)] — use Default if column missing
+        if attrs.default {
+            return quote! {
+                #field_name: match row.try_get_by_name(#col) {
+                    Ok(v) => v,
+                    Err(sentinel_driver::Error::ColumnNotFound(_)) => ::std::default::Default::default(),
+                    Err(e) => return Err(e),
+                }
+            };
+        }
+
+        // Normal field
         quote! {
             #field_name: row.try_get_by_name(#col)?
         }
@@ -290,28 +333,48 @@ fn get_single_field(input: &DeriveInput, derive_name: &str) -> syn::Result<Type>
     }
 }
 
-/// Check for `#[sentinel(rename = "column_name")]` attribute on a field.
-fn get_rename_attr(field: &syn::Field) -> Option<String> {
+/// All supported field-level `#[sentinel(...)]` attributes.
+struct FieldAttrs {
+    rename: Option<String>,
+    skip: bool,
+    default: bool,
+    try_from: Option<Type>,
+}
+
+fn parse_field_attrs(field: &syn::Field) -> syn::Result<FieldAttrs> {
+    let mut attrs = FieldAttrs {
+        rename: None,
+        skip: false,
+        default: false,
+        try_from: None,
+    };
+
     for attr in &field.attrs {
         if !attr.path().is_ident("sentinel") {
             continue;
         }
 
-        let result: syn::Result<String> = attr.parse_args_with(|input: syn::parse::ParseStream| {
-            let ident: syn::Ident = input.parse()?;
-            if ident != "rename" {
-                return Err(syn::Error::new_spanned(&ident, "expected `rename`"));
+        attr.parse_nested_meta(|meta| {
+            if meta.path.is_ident("rename") {
+                let value = meta.value()?;
+                let s: syn::LitStr = value.parse()?;
+                attrs.rename = Some(s.value());
+            } else if meta.path.is_ident("skip") {
+                attrs.skip = true;
+            } else if meta.path.is_ident("default") {
+                attrs.default = true;
+            } else if meta.path.is_ident("try_from") {
+                let value = meta.value()?;
+                let s: syn::LitStr = value.parse()?;
+                attrs.try_from = Some(syn::parse_str(&s.value())?);
+            } else {
+                return Err(meta.error("unknown sentinel attribute"));
             }
-            let _: syn::Token![=] = input.parse()?;
-            let lit: syn::LitStr = input.parse()?;
-            Ok(lit.value())
-        });
-
-        if let Ok(name) = result {
-            return Some(name);
-        }
+            Ok(())
+        })?;
     }
-    None
+
+    Ok(attrs)
 }
 
 #[cfg(test)]
