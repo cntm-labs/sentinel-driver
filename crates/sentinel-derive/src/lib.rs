@@ -159,7 +159,7 @@ fn impl_from_row(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
 /// #[derive(ToSql)]
 /// struct UserId(i32);
 /// ```
-#[proc_macro_derive(ToSql)]
+#[proc_macro_derive(ToSql, attributes(sentinel))]
 pub fn derive_to_sql(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     match impl_to_sql(&input) {
@@ -173,17 +173,67 @@ fn impl_to_sql(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
     let generics = &input.generics;
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
-    // Validate this is a newtype struct
-    get_single_field(input, "ToSql")?;
+    match &input.data {
+        Data::Enum(data) => impl_to_sql_enum(name, generics, data, input),
+        Data::Struct(_) => {
+            get_single_field(input, "ToSql")?;
+            Ok(quote! {
+                impl #impl_generics sentinel_driver::ToSql for #name #ty_generics #where_clause {
+                    fn oid(&self) -> sentinel_driver::Oid {
+                        self.0.oid()
+                    }
+
+                    fn to_sql(&self, buf: &mut bytes::BytesMut) -> sentinel_driver::Result<()> {
+                        self.0.to_sql(buf)
+                    }
+                }
+            })
+        }
+        _ => Err(syn::Error::new_spanned(
+            input,
+            "ToSql can only be derived for structs or enums",
+        )),
+    }
+}
+
+fn impl_to_sql_enum(
+    name: &syn::Ident,
+    generics: &syn::Generics,
+    data: &syn::DataEnum,
+    input: &DeriveInput,
+) -> syn::Result<proc_macro2::TokenStream> {
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+    let rename_all = get_struct_rename_all(input);
+
+    let match_arms = data.variants.iter().map(|v| {
+        let variant_name = &v.ident;
+        let label = get_variant_rename(v)
+            .or_else(|| {
+                rename_all
+                    .as_ref()
+                    .map(|s| apply_rename_all(&variant_name.to_string(), s))
+            })
+            .unwrap_or_else(|| variant_name.to_string());
+
+        quote! {
+            #name::#variant_name => {
+                buf.put_slice(#label.as_bytes());
+                Ok(())
+            }
+        }
+    });
 
     Ok(quote! {
         impl #impl_generics sentinel_driver::ToSql for #name #ty_generics #where_clause {
             fn oid(&self) -> sentinel_driver::Oid {
-                self.0.oid()
+                sentinel_driver::Oid::TEXT
             }
 
             fn to_sql(&self, buf: &mut bytes::BytesMut) -> sentinel_driver::Result<()> {
-                self.0.to_sql(buf)
+                use bytes::BufMut;
+                match self {
+                    #(#match_arms)*
+                }
             }
         }
     })
@@ -201,7 +251,7 @@ fn impl_to_sql(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
 /// #[derive(FromSql)]
 /// struct UserId(i32);
 /// ```
-#[proc_macro_derive(FromSql)]
+#[proc_macro_derive(FromSql, attributes(sentinel))]
 pub fn derive_from_sql(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     match impl_from_sql(&input) {
@@ -215,16 +265,72 @@ fn impl_from_sql(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
     let generics = &input.generics;
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
-    let inner_ty = get_single_field(input, "FromSql")?;
+    match &input.data {
+        Data::Enum(data) => impl_from_sql_enum(name, generics, data, input),
+        Data::Struct(_) => {
+            let inner_ty = get_single_field(input, "FromSql")?;
+            Ok(quote! {
+                impl #impl_generics sentinel_driver::FromSql for #name #ty_generics #where_clause {
+                    fn oid() -> sentinel_driver::Oid {
+                        <#inner_ty as sentinel_driver::FromSql>::oid()
+                    }
+
+                    fn from_sql(buf: &[u8]) -> sentinel_driver::Result<Self> {
+                        <#inner_ty as sentinel_driver::FromSql>::from_sql(buf).map(Self)
+                    }
+                }
+            })
+        }
+        _ => Err(syn::Error::new_spanned(
+            input,
+            "FromSql can only be derived for structs or enums",
+        )),
+    }
+}
+
+fn impl_from_sql_enum(
+    name: &syn::Ident,
+    generics: &syn::Generics,
+    data: &syn::DataEnum,
+    input: &DeriveInput,
+) -> syn::Result<proc_macro2::TokenStream> {
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+    let rename_all = get_struct_rename_all(input);
+
+    let match_arms = data.variants.iter().map(|v| {
+        let variant_name = &v.ident;
+        let label = get_variant_rename(v)
+            .or_else(|| {
+                rename_all
+                    .as_ref()
+                    .map(|s| apply_rename_all(&variant_name.to_string(), s))
+            })
+            .unwrap_or_else(|| variant_name.to_string());
+
+        quote! {
+            #label => Ok(#name::#variant_name),
+        }
+    });
+
+    let type_name_str = name.to_string();
 
     Ok(quote! {
         impl #impl_generics sentinel_driver::FromSql for #name #ty_generics #where_clause {
             fn oid() -> sentinel_driver::Oid {
-                <#inner_ty as sentinel_driver::FromSql>::oid()
+                sentinel_driver::Oid::TEXT
             }
 
             fn from_sql(buf: &[u8]) -> sentinel_driver::Result<Self> {
-                <#inner_ty as sentinel_driver::FromSql>::from_sql(buf).map(Self)
+                let s = ::std::str::from_utf8(buf)
+                    .map_err(|e| sentinel_driver::Error::Decode(
+                        format!("enum: invalid UTF-8: {}", e)
+                    ))?;
+                match s {
+                    #(#match_arms)*
+                    other => Err(sentinel_driver::Error::Decode(
+                        format!("unknown {} variant: '{}'", #type_name_str, other)
+                    )),
+                }
             }
         }
     })
@@ -318,6 +424,29 @@ fn get_struct_rename_all(input: &DeriveInput) -> Option<String> {
                 let ident: syn::Ident = input.parse()?;
                 if ident != "rename_all" {
                     return Err(syn::Error::new_spanned(&ident, "expected `rename_all`"));
+                }
+                let _: syn::Token![=] = input.parse()?;
+                let lit: syn::LitStr = input.parse()?;
+                Ok(lit.value())
+            });
+        if let Ok(name) = result {
+            return Some(name);
+        }
+    }
+    None
+}
+
+/// Check for `#[sentinel(rename = "...")]` on an enum variant.
+fn get_variant_rename(variant: &syn::Variant) -> Option<String> {
+    for attr in &variant.attrs {
+        if !attr.path().is_ident("sentinel") {
+            continue;
+        }
+        let result: syn::Result<String> =
+            attr.parse_args_with(|input: syn::parse::ParseStream| {
+                let ident: syn::Ident = input.parse()?;
+                if ident != "rename" {
+                    return Err(syn::Error::new_spanned(&ident, "expected `rename`"));
                 }
                 let _: syn::Token![=] = input.parse()?;
                 let lit: syn::LitStr = input.parse()?;
