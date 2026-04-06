@@ -17,11 +17,12 @@ mod types_decode;
 mod types_encode;
 mod types_geometric;
 mod types_interval;
-mod types_misc;
+mod types_lsn;
 mod types_money;
 mod types_network;
 mod types_numeric;
 mod types_range;
+mod types_xml;
 
 mod derive_composite;
 mod derive_enum;
