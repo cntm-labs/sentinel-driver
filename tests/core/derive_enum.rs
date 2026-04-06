@@ -78,3 +78,24 @@ fn test_repr_enum_roundtrip() {
 fn test_repr_enum_unknown_discriminant() {
     assert!(Status::from_sql(&99i32.to_be_bytes()).is_err());
 }
+
+// ── allow_mismatch tests ─────────────────────────────
+
+#[derive(Debug, PartialEq, sentinel_driver::FromSql)]
+#[sentinel(rename_all = "lowercase", allow_mismatch)]
+enum Color {
+    Red,
+    Blue,
+}
+
+#[test]
+fn test_allow_mismatch_known_variant() {
+    let decoded = Color::from_sql(b"red").ok();
+    assert_eq!(decoded, Some(Color::Red));
+}
+
+#[test]
+fn test_allow_mismatch_unknown_falls_back_to_first() {
+    let decoded = Color::from_sql(b"green").ok();
+    assert_eq!(decoded, Some(Color::Red));
+}

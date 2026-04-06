@@ -97,6 +97,16 @@ fn impl_from_row(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
             };
         }
 
+        // #[sentinel(from = "SourceType")] — infallible From conversion
+        if let Some(ref source_ty) = attrs.from {
+            return quote! {
+                #field_name: {
+                    let v: #source_ty = row.try_get_by_name(#col)?;
+                    <#field_ty as ::std::convert::From<#source_ty>>::from(v)
+                }
+            };
+        }
+
         // #[sentinel(try_from = "SourceType")]
         if let Some(ref source_ty) = attrs.try_from {
             if attrs.default {
@@ -338,6 +348,18 @@ fn impl_from_sql_enum(
     });
 
     let type_name_str = name.to_string();
+    let allow_mismatch = has_allow_mismatch(input);
+
+    let fallback = if allow_mismatch {
+        let first_variant = &data.variants.first().unwrap().ident;
+        quote! { _ => Ok(#name::#first_variant), }
+    } else {
+        quote! {
+            other => Err(sentinel_driver::Error::Decode(
+                format!("unknown {} variant: '{}'", #type_name_str, other)
+            )),
+        }
+    };
 
     Ok(quote! {
         impl #impl_generics sentinel_driver::FromSql for #name #ty_generics #where_clause {
@@ -352,9 +374,7 @@ fn impl_from_sql_enum(
                     ))?;
                 match s {
                     #(#match_arms)*
-                    other => Err(sentinel_driver::Error::Decode(
-                        format!("unknown {} variant: '{}'", #type_name_str, other)
-                    )),
+                    #fallback
                 }
             }
         }
@@ -571,27 +591,42 @@ fn get_repr_type(input: &DeriveInput) -> Option<syn::Ident> {
     None
 }
 
-/// Parse `#[sentinel(type_name = "pg_type")]` attribute on a struct.
-fn get_type_name(input: &DeriveInput) -> Option<String> {
+/// All supported struct/enum-level `#[sentinel(...)]` attributes.
+struct StructAttrs {
+    rename_all: Option<String>,
+    type_name: Option<String>,
+    allow_mismatch: bool,
+}
+
+fn parse_struct_attrs(input: &DeriveInput) -> StructAttrs {
+    let mut attrs = StructAttrs {
+        rename_all: None,
+        type_name: None,
+        allow_mismatch: false,
+    };
+
     for attr in &input.attrs {
         if !attr.path().is_ident("sentinel") {
             continue;
         }
-        let result: syn::Result<String> =
-            attr.parse_args_with(|input: syn::parse::ParseStream| {
-                let ident: syn::Ident = input.parse()?;
-                if ident != "type_name" {
-                    return Err(syn::Error::new_spanned(&ident, "expected `type_name`"));
-                }
-                let _: syn::Token![=] = input.parse()?;
-                let lit: syn::LitStr = input.parse()?;
-                Ok(lit.value())
-            });
-        if let Ok(name) = result {
-            return Some(name);
-        }
+
+        let _ = attr.parse_nested_meta(|meta| {
+            if meta.path.is_ident("rename_all") {
+                let value = meta.value()?;
+                let s: syn::LitStr = value.parse()?;
+                attrs.rename_all = Some(s.value());
+            } else if meta.path.is_ident("type_name") {
+                let value = meta.value()?;
+                let s: syn::LitStr = value.parse()?;
+                attrs.type_name = Some(s.value());
+            } else if meta.path.is_ident("allow_mismatch") {
+                attrs.allow_mismatch = true;
+            }
+            Ok(())
+        });
     }
-    None
+
+    attrs
 }
 
 /// Convert a field name string according to a naming convention.
@@ -669,27 +704,19 @@ fn apply_rename_all(name: &str, strategy: &str) -> String {
     }
 }
 
-/// Parse struct-level `#[sentinel(rename_all = "strategy")]` attribute.
+/// Convenience: extract just rename_all from struct-level attrs.
 fn get_struct_rename_all(input: &DeriveInput) -> Option<String> {
-    for attr in &input.attrs {
-        if !attr.path().is_ident("sentinel") {
-            continue;
-        }
-        let result: syn::Result<String> =
-            attr.parse_args_with(|input: syn::parse::ParseStream| {
-                let ident: syn::Ident = input.parse()?;
-                if ident != "rename_all" {
-                    return Err(syn::Error::new_spanned(&ident, "expected `rename_all`"));
-                }
-                let _: syn::Token![=] = input.parse()?;
-                let lit: syn::LitStr = input.parse()?;
-                Ok(lit.value())
-            });
-        if let Ok(name) = result {
-            return Some(name);
-        }
-    }
-    None
+    parse_struct_attrs(input).rename_all
+}
+
+/// Convenience: check for allow_mismatch on struct-level attrs.
+fn has_allow_mismatch(input: &DeriveInput) -> bool {
+    parse_struct_attrs(input).allow_mismatch
+}
+
+/// Convenience: extract type_name from struct-level attrs.
+fn get_type_name(input: &DeriveInput) -> Option<String> {
+    parse_struct_attrs(input).type_name
 }
 
 /// Check for `#[sentinel(rename = "...")]` on an enum variant.
@@ -722,6 +749,7 @@ struct FieldAttrs {
     skip: bool,
     default: bool,
     try_from: Option<Type>,
+    from: Option<Type>,
     flatten: bool,
     json: bool,
 }
@@ -732,6 +760,7 @@ fn parse_field_attrs(field: &syn::Field) -> syn::Result<FieldAttrs> {
         skip: false,
         default: false,
         try_from: None,
+        from: None,
         flatten: false,
         json: false,
     };
@@ -754,6 +783,10 @@ fn parse_field_attrs(field: &syn::Field) -> syn::Result<FieldAttrs> {
                 let value = meta.value()?;
                 let s: syn::LitStr = value.parse()?;
                 attrs.try_from = Some(syn::parse_str(&s.value())?);
+            } else if meta.path.is_ident("from") {
+                let value = meta.value()?;
+                let s: syn::LitStr = value.parse()?;
+                attrs.from = Some(syn::parse_str(&s.value())?);
             } else if meta.path.is_ident("flatten") {
                 attrs.flatten = true;
             } else if meta.path.is_ident("json") {
