@@ -54,12 +54,20 @@ fn impl_from_row(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
         }
     };
 
+    let rename_all = get_struct_rename_all(input);
+
     let field_extractions = fields.iter().map(|f| {
         let field_name = f.ident.as_ref().unwrap();
         let column_name = field_name.to_string();
 
-        // Check for #[sentinel(rename = "...")] attribute
-        let col = get_rename_attr(f).unwrap_or(column_name);
+        // Per-field rename takes precedence over rename_all
+        let col = get_rename_attr(f).unwrap_or_else(|| {
+            if let Some(ref strategy) = rename_all {
+                apply_rename_all(&column_name, strategy)
+            } else {
+                column_name
+            }
+        });
 
         quote! {
             #field_name: row.try_get_by_name(#col)?
@@ -162,6 +170,104 @@ fn impl_from_sql(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
 }
 
 // ── Helpers ──────────────────────────────────────────
+
+/// Convert a field name string according to a naming convention.
+fn apply_rename_all(name: &str, strategy: &str) -> String {
+    match strategy {
+        "lowercase" => name.to_lowercase(),
+        "UPPERCASE" => name.to_uppercase(),
+        "camelCase" => {
+            let mut result = String::new();
+            let mut capitalize_next = false;
+            for (i, c) in name.chars().enumerate() {
+                if c == '_' {
+                    capitalize_next = true;
+                } else if capitalize_next {
+                    result.extend(c.to_uppercase());
+                    capitalize_next = false;
+                } else if i == 0 {
+                    result.extend(c.to_lowercase());
+                } else {
+                    result.push(c);
+                }
+            }
+            result
+        }
+        "PascalCase" => {
+            let mut result = String::new();
+            let mut capitalize_next = true;
+            for c in name.chars() {
+                if c == '_' {
+                    capitalize_next = true;
+                } else if capitalize_next {
+                    result.extend(c.to_uppercase());
+                    capitalize_next = false;
+                } else {
+                    result.push(c);
+                }
+            }
+            result
+        }
+        "snake_case" => {
+            let mut result = String::new();
+            for (i, c) in name.chars().enumerate() {
+                if c.is_uppercase() && i > 0 {
+                    result.push('_');
+                }
+                result.extend(c.to_lowercase());
+            }
+            result
+        }
+        "SCREAMING_SNAKE_CASE" => {
+            let mut result = String::new();
+            for (i, c) in name.chars().enumerate() {
+                if c.is_uppercase() && i > 0 {
+                    result.push('_');
+                }
+                result.extend(c.to_uppercase());
+            }
+            result
+        }
+        "kebab-case" => {
+            let mut result = String::new();
+            for (i, c) in name.chars().enumerate() {
+                if c == '_' {
+                    result.push('-');
+                } else if c.is_uppercase() && i > 0 {
+                    result.push('-');
+                    result.extend(c.to_lowercase());
+                } else {
+                    result.extend(c.to_lowercase());
+                }
+            }
+            result
+        }
+        _ => name.to_string(),
+    }
+}
+
+/// Parse struct-level `#[sentinel(rename_all = "strategy")]` attribute.
+fn get_struct_rename_all(input: &DeriveInput) -> Option<String> {
+    for attr in &input.attrs {
+        if !attr.path().is_ident("sentinel") {
+            continue;
+        }
+        let result: syn::Result<String> =
+            attr.parse_args_with(|input: syn::parse::ParseStream| {
+                let ident: syn::Ident = input.parse()?;
+                if ident != "rename_all" {
+                    return Err(syn::Error::new_spanned(&ident, "expected `rename_all`"));
+                }
+                let _: syn::Token![=] = input.parse()?;
+                let lit: syn::LitStr = input.parse()?;
+                Ok(lit.value())
+            });
+        if let Ok(name) = result {
+            return Some(name);
+        }
+    }
+    None
+}
 
 /// Extract the inner type from a newtype (struct with exactly one unnamed field).
 fn get_single_field(input: &DeriveInput, derive_name: &str) -> syn::Result<Type> {

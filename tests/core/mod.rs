@@ -21,3 +21,5 @@ mod types_money;
 mod types_network;
 mod types_numeric;
 mod types_range;
+
+mod derive_from_row;
