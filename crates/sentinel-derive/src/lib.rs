@@ -725,23 +725,21 @@ fn get_variant_rename(variant: &syn::Variant) -> Option<String> {
         if !attr.path().is_ident("sentinel") {
             continue;
         }
-        let result: syn::Result<String> =
-            attr.parse_args_with(|input: syn::parse::ParseStream| {
-                let ident: syn::Ident = input.parse()?;
-                if ident != "rename" {
-                    return Err(syn::Error::new_spanned(&ident, "expected `rename`"));
-                }
-                let _: syn::Token![=] = input.parse()?;
-                let lit: syn::LitStr = input.parse()?;
-                Ok(lit.value())
-            });
+        let result: syn::Result<String> = attr.parse_args_with(|input: syn::parse::ParseStream| {
+            let ident: syn::Ident = input.parse()?;
+            if ident != "rename" {
+                return Err(syn::Error::new_spanned(&ident, "expected `rename`"));
+            }
+            let _: syn::Token![=] = input.parse()?;
+            let lit: syn::LitStr = input.parse()?;
+            Ok(lit.value())
+        });
         if let Ok(name) = result {
             return Some(name);
         }
     }
     None
 }
-
 
 /// All supported field-level `#[sentinel(...)]` attributes.
 struct FieldAttrs {

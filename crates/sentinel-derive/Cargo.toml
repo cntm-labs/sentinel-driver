@@ -2,7 +2,7 @@
 name = "sentinel-derive"
 version = "0.1.0"
 edition = "2021"
-description = "Derive macros (FromRow, ToSql, FromSql) for sentinel-driver"
+description = "Derive macros (FromRow, ToSql, FromSql) for sentinel-driver — enum, composite, rename_all, skip, default, flatten, json, try_from"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/cntm-labs/sentinel-driver"
 homepage = "https://github.com/cntm-labs/sentinel-driver"
