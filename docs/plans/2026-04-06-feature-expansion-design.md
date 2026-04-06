@@ -1,41 +1,186 @@
 # Feature Expansion Design — sentinel-driver v0.2+
 
 **Date:** 2026-04-06
-**Status:** Approved
+**Last Updated:** 2026-04-06
+**Status:** In Progress (Phase 1A complete on feature branch)
 **Goal:** Close feature gaps against sqlx, tokio-postgres, and diesel to make sentinel-driver the most complete PG-only driver in Rust.
 
 ---
 
-## Context
+## Current Status
 
-sentinel-driver v0.1 has strong architectural advantages:
-- Only Rust PG driver with true pipeline mode (PG 14+)
-- Correct SCRAM-SHA-256 with SASLprep (sqlx has a bug, tokio-postgres silently falls back)
-- Two-tier statement cache (HashMap + LRU-256) with metrics
-- Single-task architecture (<0.5μs pool checkout, no channel overhead)
-- Built-in query timeout + cancel (no other driver has both)
-- Binary encoding by default
+### What's shipped (main branch):
+- 26 OIDs (18 scalar + 9 array)
+- Pipeline mode, COPY, LISTEN/NOTIFY, Transactions
+- Query timeout + cancel, Two-tier statement cache
+- Connection pool (<0.5μs checkout)
+- SCRAM-SHA-256 (correct SASLprep), TLS (5 modes)
 
-However, type coverage (18 scalar types) lags significantly behind competitors (25-30+), and several query engine capabilities are missing.
+### What's ready to merge (feature/phase1a-types):
+- 62 OIDs (+36 new) — Interval, INET/CIDR/MACADDR, NUMERIC/Decimal, Range<T>, Geometric, Money, XML, PG_LSN
+- 8 new type modules (1,157 LOC added)
+- Optional `with-rust-decimal` feature flag
+- Full test coverage for all new types
 
-## Competitor Analysis Summary
+### What's still planned:
+- Phase 1B: Custom Enums, Composite Types
+- Phase 1C: BIT/VARBIT, HSTORE (remaining completeness types)
+- Phase 2: Row Streaming, Simple Query, Portal/Cursor, Pool Callbacks
+- Phase 3: Certificate Auth, SCRAM-PLUS, Direct TLS, Observability, Benchmarks
 
-| Area | sentinel | sqlx | tokio-postgres | diesel |
-|------|:--------:|:----:|:--------------:|:------:|
-| Pipeline mode | YES | NO | NO | NO |
-| Correct SCRAM | YES | NO | partial | libpq |
-| 2-tier stmt cache | YES | NO | NO | NO |
-| Pool <0.5μs | YES | NO | NO | NO |
-| Built-in timeout+cancel | YES | NO | NO | NO |
-| Type coverage | 18 | 25+ | 30+ | 25+ |
-| Row streaming | NO | YES | YES | YES |
-| Simple query protocol | NO | YES | YES | YES |
-| Portal/cursor | NO | NO | YES | NO |
-| Certificate auth | NO | YES | YES | YES |
-| Channel binding | NO | NO | YES | libpq |
-| Advisory locks API | NO | YES | NO | NO |
-| tracing spans | NO | NO | NO | NO |
-| Benchmarks | NO | NO | NO | YES |
+---
+
+## Competitor Comparison (Updated)
+
+### Architecture & Protocol
+
+| Feature | sentinel | sqlx | tokio-postgres | diesel | sea-orm |
+|---------|:--------:|:----:|:--------------:|:------:|:-------:|
+| PG-only (no abstraction tax) | **YES** | NO (multi-DB) | YES | NO (multi-DB) | NO (multi-DB) |
+| Pipeline mode (PG 14+) | **YES** | NO | NO* | NO | NO |
+| Binary encoding default | **YES** | YES | YES | COPY only | NO (text) |
+| Single-task architecture | **YES** | YES | NO (2-task) | sync | via sqlx |
+| Zero-copy row access | **YES** | YES | YES | NO | NO |
+| Simple query protocol | YES | YES | YES | YES | YES |
+
+> \*tokio-postgres has "implicit pipelining" via concurrent futures but not PG pipeline protocol
+
+### Connection Pool
+
+| Feature | sentinel | sqlx | tokio-postgres | diesel | sea-orm |
+|---------|:--------:|:----:|:--------------:|:------:|:-------:|
+| Built-in pool | **YES** | YES | via deadpool/bb8 | via r2d2 | via sqlx |
+| Pool checkout latency | **<0.5μs** | ~μs | ~μs | ~μs | via sqlx |
+| Health check strategies | **3 modes** | ping only | recycle only | ping | ping |
+| Pool callbacks | NO | **YES** (3) | deadpool recycle | NO | **YES** |
+| Lazy connect | NO | **YES** | NO | NO | **YES** |
+| Pool metrics | basic | NO | NO | NO | NO |
+
+### Authentication & TLS
+
+| Feature | sentinel | sqlx | tokio-postgres | diesel |
+|---------|:--------:|:----:|:--------------:|:------:|
+| SCRAM-SHA-256 | **YES** (correct SASLprep) | YES (buggy) | YES (fallback) | libpq |
+| SCRAM-SHA-256-PLUS | NO | NO | **YES** | libpq |
+| MD5 auth | YES | YES | YES | YES |
+| Certificate auth | NO | **YES** | **YES** | YES |
+| rustls TLS | **YES** | YES | third-party | NO |
+| SSL modes | **5** (all) | 4 (Allow broken) | 3 | libpq |
+| Direct TLS (PG 17+) | NO | NO | **YES** | NO |
+
+### Prepared Statements & Cache
+
+| Feature | sentinel | sqlx | tokio-postgres | diesel |
+|---------|:--------:|:----:|:--------------:|:------:|
+| Statement cache | **2-tier** (HashMap+LRU) | LRU-100 | NO (deadpool: unbounded) | compile-time |
+| Cache metrics | **YES** | NO | NO | NO |
+| Cache capacity | 256 (configurable) | 100 (fixed) | unbounded | N/A |
+
+### Type System Coverage
+
+| Type Category | sentinel (main) | sentinel (phase1a) | sqlx | tokio-postgres | diesel |
+|---------------|:---:|:---:|:---:|:---:|:---:|
+| **Primitives** (bool, int, float) | 6 | 6 | 7 | 7 | 7 |
+| **String** (text, varchar, char) | 3 | 3 | 5+ | 5+ | 3 |
+| **Binary** (bytea) | YES | YES | YES | YES | YES |
+| **Temporal** (date, time, timestamp, timestamptz) | 4 | 4 | 6+ | 6+ | 4 |
+| **Interval** | NO | **YES** | YES | YES | NO |
+| **UUID** | YES | YES | YES | YES | YES |
+| **JSON/JSONB** | YES | YES | YES | YES | YES |
+| **NUMERIC/Decimal** | NO | **YES** (feature) | YES | third-party | YES |
+| **INET/CIDR** | NO | **YES** | YES | YES | YES |
+| **MACADDR** | NO | **YES** | YES | YES | YES |
+| **Range types** (6 variants) | NO | **YES** | YES | YES | YES |
+| **Geometric** (point, line, etc.) | NO | **YES** (7 types) | YES (7) | YES | NO |
+| **Money** | NO | **YES** | YES | YES | YES |
+| **XML** | NO | **YES** | NO | NO | NO |
+| **PG_LSN** | NO | **YES** | NO | YES | YES |
+| **Custom Enums** | NO | NO | YES | YES | YES |
+| **Composite Types** | NO | NO | YES | YES | YES |
+| **BIT/VARBIT** | NO | NO | YES | YES | NO |
+| **HSTORE** | NO | NO | YES | YES | NO |
+| **Arrays** | 9 types | 20+ types | any T (1D) | any T | any T |
+| **Total OIDs** | **26** | **62** | ~70+ | ~200 | ~50+ |
+
+### Query Execution
+
+| Feature | sentinel | sqlx | tokio-postgres | diesel | sea-orm |
+|---------|:--------:|:----:|:--------------:|:------:|:-------:|
+| Query timeout (built-in) | **YES** | NO | NO | NO | server-side |
+| Cancel query | **YES** | NO | **YES** | libpq | NO |
+| Timeout + Cancel combined | **YES** | NO | NO | NO | NO |
+| Row streaming | NO | **YES** | **YES** | YES | YES |
+| Portal/Cursor | NO | NO | **YES** | NO | NO |
+| COPY IN/OUT (text) | **YES** | YES | YES | YES (2.2+) | NO |
+| COPY IN/OUT (binary) | **YES** | raw only | **YES** | **YES** | NO |
+| LISTEN/NOTIFY | **YES** | **YES** (auto-reconnect) | manual | NO | NO |
+| Pipeline batch | **YES** | NO | NO | NO | NO |
+| Compile-time SQL check | NO | **YES** (query!()) | NO | **YES** | NO |
+
+### Transactions
+
+| Feature | sentinel | sqlx | tokio-postgres | diesel | sea-orm |
+|---------|:--------:|:----:|:--------------:|:------:|:-------:|
+| Isolation levels (4) | **YES** | custom SQL | **YES** | YES | YES |
+| Savepoints | **YES** | auto-nested | **YES** | YES | YES |
+| Read-only / Deferrable | **YES** | custom SQL | **YES** | NO | YES |
+
+### Observability & DX
+
+| Feature | sentinel | sqlx | tokio-postgres | diesel | sea-orm |
+|---------|:--------:|:----:|:--------------:|:------:|:-------:|
+| tracing integration | basic | log levels | log crate | NO | **YES** (spans) |
+| Query metrics/callbacks | cache only | NO | NO | NO | **YES** |
+| Slow query logging | NO | **YES** | NO | NO | **YES** |
+| Advisory locks (RAII) | NO | **YES** | NO | NO | NO |
+| Migrations | NO | **YES** | NO | **YES** | **YES** |
+| Derive macros | **YES** (3) | **YES** (3+) | **YES** (2) | **YES** | via ORM |
+| Mock driver | NO | NO | NO | NO | **YES** |
+| Benchmarks | NO | NO | NO | YES | NO |
+
+---
+
+## Competitive Advantages (Unique to sentinel-driver)
+
+| Advantage | Detail | Impact |
+|-----------|--------|--------|
+| **Only pipeline mode in Rust** | True PG 14+ protocol — batch N queries in 1 round-trip | 2-5x throughput for batch workloads |
+| **Correct SCRAM-SHA-256** | sqlx has SASLprep bug on passwords, tokio-pg falls back silently | Non-ASCII passwords actually work |
+| **Two-tier statement cache** | HashMap (permanent) + LRU-256 (ad-hoc) with hit/miss metrics | ~99% cache hit rate, zero eviction for hot queries |
+| **Timeout + Cancel built-in** | No other driver combines both — query timeout auto-cancels on server | Prevents runaway queries without orphan server processes |
+| **Pool <0.5μs checkout** | Single-task = no channel overhead vs tokio-pg's 2-task model | Negligible pool overhead |
+| **PG-only design** | No multi-DB abstraction tax (unlike sqlx, diesel, sea-orm) | Smaller binary, simpler API, faster compilation |
+
+---
+
+## Competitive Weaknesses (Gaps to Close)
+
+### Critical (blocks production adoption):
+| Gap | Who Has It | Priority |
+|-----|-----------|----------|
+| Custom PG Enums | sqlx, tokio-pg, diesel | **Phase 1B** |
+| Composite Types | sqlx, tokio-pg, diesel | **Phase 1B** |
+| Row streaming | sqlx, tokio-pg | **Phase 2A** |
+
+### Important (enterprise/production):
+| Gap | Who Has It | Priority |
+|-----|-----------|----------|
+| Certificate auth | sqlx, tokio-pg | Phase 3A |
+| SCRAM-SHA-256-PLUS | tokio-pg | Phase 3A |
+| Pool callbacks | sqlx, sea-orm | Phase 2B |
+| Advisory locks | sqlx | Phase 3C |
+| Tracing spans | sea-orm | Phase 3B |
+| Slow query logging | sqlx, sea-orm | Phase 3B |
+
+### Nice-to-have (completeness):
+| Gap | Who Has It | Priority |
+|-----|-----------|----------|
+| BIT/VARBIT | sqlx, tokio-pg | Phase 1C |
+| HSTORE | sqlx, tokio-pg | Phase 1C |
+| Portal/Cursor | tokio-pg | Phase 2B |
+| Lazy connect | sqlx, sea-orm | Phase 2B |
+| Direct TLS (PG 17+) | tokio-pg | Phase 3A |
+| Benchmarks | diesel | Phase 3C |
 
 ---
 
@@ -281,16 +426,18 @@ Built-in (no feature flag needed): interval, range, money, geometric structs, hs
 
 ---
 
-## Implementation Order
+## Implementation Progress
 
-1. **Phase 1A** — NUMERIC, INET/CIDR, Interval, Range (highest impact types)
-2. **Phase 1B** — Custom Enums, Composite Types (require runtime OID resolution)
-3. **Phase 1C** — Geometric, Money, BIT, HSTORE, MACADDR, XML, PG_LSN (completeness)
-4. **Phase 2A** — Row Streaming, Simple Query Protocol (most requested capabilities)
-5. **Phase 2B** — Portal/Cursor, Pool Callbacks, Lazy Connect
-6. **Phase 3A** — Certificate Auth, SCRAM-PLUS, Direct TLS
-7. **Phase 3B** — Tracing Spans, Slow Query Logging, Metrics Callback, Pool Metrics
-8. **Phase 3C** — Advisory Locks, Criterion Benchmarks
+| Phase | Scope | Status | OIDs | Branch |
+|-------|-------|--------|------|--------|
+| **1A** | NUMERIC, INET/CIDR, Interval, Range, Geometric, Money, XML, LSN | **DONE** | +36 | `feature/phase1a-types` |
+| **1B** | Custom Enums, Composite Types | PLANNED | +dynamic | — |
+| **1C** | BIT/VARBIT, HSTORE | PLANNED | +4 | — |
+| **2A** | Row Streaming, Simple Query Protocol | PLANNED | — | — |
+| **2B** | Portal/Cursor, Pool Callbacks, Lazy Connect | PLANNED | — | — |
+| **3A** | Certificate Auth, SCRAM-PLUS, Direct TLS | PLANNED | — | — |
+| **3B** | Tracing Spans, Slow Query, Metrics, Pool Metrics | PLANNED | — | — |
+| **3C** | Advisory Locks, Criterion Benchmarks | PLANNED | — | — |
 
 Each sub-phase is independently shippable as a minor version bump.
 
@@ -299,8 +446,22 @@ Each sub-phase is independently shippable as a minor version bump.
 ## Success Criteria
 
 After full implementation:
-- Type coverage: 50+ OIDs (matching or exceeding all competitors)
+- Type coverage: 70+ OIDs (matching or exceeding all competitors)
 - Only Rust PG driver with: pipeline + streaming + cursor + advisory locks + correct SCRAM-PLUS
 - Benchmark suite proving performance claims
 - Enterprise-ready: cert auth, channel binding, direct TLS, full observability
 - Feature parity or superiority in every category vs sqlx, tokio-postgres, and diesel
+
+---
+
+## Codebase Metrics (Current)
+
+| Metric | Main Branch | After Phase 1A Merge |
+|--------|:-----------:|:--------------------:|
+| Total OIDs | 26 | 62 |
+| ToSql impls | 17 | 32 |
+| FromSql impls | 13 | 28 |
+| Type modules | 3 files | 11 files |
+| Types LOC | 824 | 1,981 |
+| Core tests | 150 | 180+ |
+| Test files | 17 | 20+ |
