@@ -42,3 +42,39 @@ fn test_enum_roundtrip() {
     let decoded = Mood::from_sql(&buf).ok();
     assert_eq!(decoded, Some(Mood::Sad));
 }
+
+// ── Integer-repr enum tests ──────────────────────────
+
+#[derive(Debug, PartialEq, Clone, Copy, sentinel_driver::ToSql, sentinel_driver::FromSql)]
+#[repr(i32)]
+enum Status {
+    Pending = 0,
+    Active = 1,
+    Suspended = 2,
+}
+
+#[test]
+fn test_repr_enum_to_sql() {
+    let mut buf = BytesMut::new();
+    Status::Active.to_sql(&mut buf).ok();
+    assert_eq!(&buf[..], &1i32.to_be_bytes());
+}
+
+#[test]
+fn test_repr_enum_from_sql() {
+    let decoded = Status::from_sql(&2i32.to_be_bytes()).ok();
+    assert_eq!(decoded, Some(Status::Suspended));
+}
+
+#[test]
+fn test_repr_enum_roundtrip() {
+    let mut buf = BytesMut::new();
+    Status::Pending.to_sql(&mut buf).ok();
+    let decoded = Status::from_sql(&buf).ok();
+    assert_eq!(decoded, Some(Status::Pending));
+}
+
+#[test]
+fn test_repr_enum_unknown_discriminant() {
+    assert!(Status::from_sql(&99i32.to_be_bytes()).is_err());
+}

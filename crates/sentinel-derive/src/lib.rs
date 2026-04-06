@@ -202,6 +202,11 @@ fn impl_to_sql_enum(
     data: &syn::DataEnum,
     input: &DeriveInput,
 ) -> syn::Result<proc_macro2::TokenStream> {
+    // Check for #[repr(iN)] for integer enums
+    if let Some(repr_ty) = get_repr_type(input) {
+        return impl_to_sql_enum_repr(name, generics, data, &repr_ty);
+    }
+
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
     let rename_all = get_struct_rename_all(input);
 
@@ -294,6 +299,11 @@ fn impl_from_sql_enum(
     data: &syn::DataEnum,
     input: &DeriveInput,
 ) -> syn::Result<proc_macro2::TokenStream> {
+    // Check for #[repr(iN)] for integer enums
+    if let Some(repr_ty) = get_repr_type(input) {
+        return impl_from_sql_enum_repr(name, generics, data, &repr_ty);
+    }
+
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
     let rename_all = get_struct_rename_all(input);
 
@@ -336,7 +346,101 @@ fn impl_from_sql_enum(
     })
 }
 
+// ── Integer-Repr Enum ────────────────────────────────
+
+fn impl_to_sql_enum_repr(
+    name: &syn::Ident,
+    generics: &syn::Generics,
+    _data: &syn::DataEnum,
+    repr_ty: &syn::Ident,
+) -> syn::Result<proc_macro2::TokenStream> {
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+
+    let oid_const = match repr_ty.to_string().as_str() {
+        "i8" | "u8" => quote! { sentinel_driver::Oid::CHAR },
+        "i16" | "u16" => quote! { sentinel_driver::Oid::INT2 },
+        "i32" | "u32" => quote! { sentinel_driver::Oid::INT4 },
+        "i64" | "u64" => quote! { sentinel_driver::Oid::INT8 },
+        _ => quote! { sentinel_driver::Oid::INT4 },
+    };
+
+    Ok(quote! {
+        impl #impl_generics sentinel_driver::ToSql for #name #ty_generics #where_clause {
+            fn oid(&self) -> sentinel_driver::Oid {
+                #oid_const
+            }
+
+            fn to_sql(&self, buf: &mut bytes::BytesMut) -> sentinel_driver::Result<()> {
+                (*self as #repr_ty).to_sql(buf)
+            }
+        }
+    })
+}
+
+fn impl_from_sql_enum_repr(
+    name: &syn::Ident,
+    generics: &syn::Generics,
+    data: &syn::DataEnum,
+    repr_ty: &syn::Ident,
+) -> syn::Result<proc_macro2::TokenStream> {
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+
+    let oid_const = match repr_ty.to_string().as_str() {
+        "i8" | "u8" => quote! { sentinel_driver::Oid::CHAR },
+        "i16" | "u16" => quote! { sentinel_driver::Oid::INT2 },
+        "i32" | "u32" => quote! { sentinel_driver::Oid::INT4 },
+        "i64" | "u64" => quote! { sentinel_driver::Oid::INT8 },
+        _ => quote! { sentinel_driver::Oid::INT4 },
+    };
+
+    let match_arms = data.variants.iter().map(|v| {
+        let variant_name = &v.ident;
+        quote! {
+            x if x == #name::#variant_name as #repr_ty => Ok(#name::#variant_name),
+        }
+    });
+
+    let type_name_str = name.to_string();
+
+    Ok(quote! {
+        impl #impl_generics sentinel_driver::FromSql for #name #ty_generics #where_clause {
+            fn oid() -> sentinel_driver::Oid {
+                #oid_const
+            }
+
+            fn from_sql(buf: &[u8]) -> sentinel_driver::Result<Self> {
+                let val = <#repr_ty as sentinel_driver::FromSql>::from_sql(buf)?;
+                match val {
+                    #(#match_arms)*
+                    other => Err(sentinel_driver::Error::Decode(
+                        format!("unknown {} discriminant: {}", #type_name_str, other)
+                    )),
+                }
+            }
+        }
+    })
+}
+
 // ── Helpers ──────────────────────────────────────────
+
+/// Check for `#[repr(i8/i16/i32/i64/u8/u16/u32/u64)]` on an enum.
+fn get_repr_type(input: &DeriveInput) -> Option<syn::Ident> {
+    for attr in &input.attrs {
+        if attr.path().is_ident("repr") {
+            let ty: syn::Result<syn::Ident> = attr.parse_args();
+            if let Ok(ident) = ty {
+                let s = ident.to_string();
+                if matches!(
+                    s.as_str(),
+                    "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64"
+                ) {
+                    return Some(ident);
+                }
+            }
+        }
+    }
+    None
+}
 
 /// Convert a field name string according to a naming convention.
 fn apply_rename_all(name: &str, strategy: &str) -> String {
