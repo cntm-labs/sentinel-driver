@@ -262,6 +262,15 @@ impl_array_to_sql!(
 impl_array_to_sql!(crate::types::money::PgMoney, Oid::MONEY_ARRAY, Oid::MONEY);
 impl_array_to_sql!(crate::types::xml::PgXml, Oid::XML_ARRAY, Oid::XML);
 impl_array_to_sql!(crate::types::lsn::PgLsn, Oid::PG_LSN_ARRAY, Oid::PG_LSN);
+impl_array_to_sql!(crate::types::network::PgInet, Oid::INET_ARRAY, Oid::INET);
+impl_array_to_sql!(crate::types::network::PgCidr, Oid::CIDR_ARRAY, Oid::CIDR);
+impl_array_to_sql!(
+    crate::types::network::PgMacAddr,
+    Oid::MACADDR_ARRAY,
+    Oid::MACADDR
+);
+#[cfg(feature = "with-rust-decimal")]
+impl_array_to_sql!(rust_decimal::Decimal, Oid::NUMERIC_ARRAY, Oid::NUMERIC);
 
 impl ToSql for Vec<&str> {
     fn oid(&self) -> Oid {

@@ -294,3 +294,61 @@ fn test_ipaddr_from_sql_v6() {
     let decoded = IpAddr::from_sql(&buf).ok();
     assert_eq!(decoded, Some(IpAddr::V6(Ipv6Addr::LOCALHOST)));
 }
+
+// -- Array roundtrip tests --
+
+#[test]
+fn test_inet_array_roundtrip() {
+    let val = vec![
+        PgInet {
+            addr: IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)),
+            netmask: 32,
+        },
+        PgInet {
+            addr: IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)),
+            netmask: 24,
+        },
+    ];
+    let mut buf = BytesMut::new();
+    val.to_sql(&mut buf).ok();
+    let decoded = Vec::<PgInet>::from_sql(&buf).ok();
+    assert_eq!(decoded.as_ref(), Some(&val));
+    assert_eq!(val.oid(), Oid::INET_ARRAY);
+}
+
+#[test]
+fn test_cidr_array_roundtrip() {
+    use sentinel_driver::types::network::PgCidr;
+    let val = vec![PgCidr {
+        addr: IpAddr::V4(Ipv4Addr::new(10, 0, 0, 0)),
+        netmask: 8,
+    }];
+    let mut buf = BytesMut::new();
+    val.to_sql(&mut buf).ok();
+    let decoded = Vec::<PgCidr>::from_sql(&buf).ok();
+    assert_eq!(decoded.as_ref(), Some(&val));
+    assert_eq!(val.oid(), Oid::CIDR_ARRAY);
+}
+
+#[test]
+fn test_macaddr_array_roundtrip() {
+    use sentinel_driver::types::network::PgMacAddr;
+    let val = vec![
+        PgMacAddr([0x08, 0x00, 0x2b, 0x01, 0x02, 0x03]),
+        PgMacAddr([0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF]),
+    ];
+    let mut buf = BytesMut::new();
+    val.to_sql(&mut buf).ok();
+    let decoded = Vec::<PgMacAddr>::from_sql(&buf).ok();
+    assert_eq!(decoded.as_ref(), Some(&val));
+    assert_eq!(val.oid(), Oid::MACADDR_ARRAY);
+}
+
+#[test]
+fn test_inet_array_empty() {
+    let val: Vec<PgInet> = vec![];
+    let mut buf = BytesMut::new();
+    val.to_sql(&mut buf).ok();
+    let decoded = Vec::<PgInet>::from_sql(&buf).ok();
+    assert_eq!(decoded, Some(vec![]));
+}

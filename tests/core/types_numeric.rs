@@ -98,4 +98,18 @@ mod numeric_tests {
         roundtrip(&Decimal::new(5, 3)); // 0.005
         roundtrip(&Decimal::new(1, 8)); // 0.00000001
     }
+
+    #[test]
+    fn test_numeric_array_roundtrip() {
+        let val = vec![
+            Decimal::new(100, 2),   // 1.00
+            Decimal::new(-5050, 2), // -50.50
+            Decimal::ZERO,
+        ];
+        let mut buf = BytesMut::new();
+        val.to_sql(&mut buf).ok();
+        let decoded = Vec::<Decimal>::from_sql(&buf).ok();
+        assert_eq!(decoded.as_ref(), Some(&val));
+        assert_eq!(val.oid(), Oid::NUMERIC_ARRAY);
+    }
 }
