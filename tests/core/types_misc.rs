@@ -60,3 +60,16 @@ fn test_lsn_wire_format() {
     assert_eq!(buf.len(), 8);
     assert_eq!(&buf[..], &42i64.to_be_bytes());
 }
+
+#[test]
+fn test_lsn_decode_wrong_size() {
+    // covers lsn.rs line 32: map_err for wrong byte count
+    assert!(PgLsn::from_sql(&[0u8; 4]).is_err());
+    assert!(PgLsn::from_sql(&[0u8; 10]).is_err());
+}
+
+#[test]
+fn test_xml_decode_empty() {
+    let decoded = PgXml::from_sql(&[]).ok();
+    assert_eq!(decoded, Some(PgXml(String::new())));
+}

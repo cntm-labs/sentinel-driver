@@ -186,17 +186,40 @@ fn test_inet_ipv6_wrong_addr_len() {
 #[test]
 fn test_cidr_oid() {
     use sentinel_driver::types::network::PgCidr;
+    // ToSql::oid (instance method)
     let val = PgCidr {
         addr: IpAddr::V4(Ipv4Addr::LOCALHOST),
         netmask: 32,
     };
     assert_eq!(val.oid(), Oid::CIDR);
+    // FromSql::oid (static method) — covers line 138-140
+    assert_eq!(<PgCidr as FromSql>::oid(), Oid::CIDR);
 }
 
 #[test]
 fn test_macaddr_oid() {
     use sentinel_driver::types::network::PgMacAddr;
+    // ToSql::oid (instance method)
     assert_eq!(PgMacAddr([0; 6]).oid(), Oid::MACADDR);
+    // FromSql::oid (static method) — covers line 162-164
+    assert_eq!(<PgMacAddr as FromSql>::oid(), Oid::MACADDR);
+}
+
+#[test]
+fn test_inet_from_sql_oid() {
+    // FromSql::oid (static method) — covers line 114-116
+    assert_eq!(<PgInet as FromSql>::oid(), Oid::INET);
+}
+
+#[test]
+fn test_ipaddr_oid() {
+    // ToSql::oid (instance method) — covers line 177-179
+    let v4 = IpAddr::V4(Ipv4Addr::LOCALHOST);
+    assert_eq!(v4.oid(), Oid::INET);
+    let v6 = IpAddr::V6(Ipv6Addr::LOCALHOST);
+    assert_eq!(v6.oid(), Oid::INET);
+    // FromSql::oid (static method) — covers line 192-194
+    assert_eq!(<IpAddr as FromSql>::oid(), Oid::INET);
 }
 
 #[test]
