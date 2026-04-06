@@ -70,6 +70,13 @@ fn impl_from_row(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
             };
         }
 
+        // #[sentinel(flatten)] — delegate to nested FromRow
+        if attrs.flatten {
+            return quote! {
+                #field_name: #field_ty::from_row(row)?
+            };
+        }
+
         // Determine column name
         let col = attrs.rename.unwrap_or_else(|| {
             if let Some(ref strategy) = rename_all {
@@ -78,6 +85,17 @@ fn impl_from_row(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
                 column_name
             }
         });
+
+        // #[sentinel(json)] — decode as JSON string then deserialize
+        if attrs.json {
+            return quote! {
+                #field_name: {
+                    let json_str: String = row.try_get_by_name(#col)?;
+                    serde_json::from_str(&json_str)
+                        .map_err(|e| sentinel_driver::Error::Decode(format!("json: {}", e)))?
+                }
+            };
+        }
 
         // #[sentinel(try_from = "SourceType")]
         if let Some(ref source_ty) = attrs.try_from {
@@ -339,6 +357,8 @@ struct FieldAttrs {
     skip: bool,
     default: bool,
     try_from: Option<Type>,
+    flatten: bool,
+    json: bool,
 }
 
 fn parse_field_attrs(field: &syn::Field) -> syn::Result<FieldAttrs> {
@@ -347,6 +367,8 @@ fn parse_field_attrs(field: &syn::Field) -> syn::Result<FieldAttrs> {
         skip: false,
         default: false,
         try_from: None,
+        flatten: false,
+        json: false,
     };
 
     for attr in &field.attrs {
@@ -367,6 +389,10 @@ fn parse_field_attrs(field: &syn::Field) -> syn::Result<FieldAttrs> {
                 let value = meta.value()?;
                 let s: syn::LitStr = value.parse()?;
                 attrs.try_from = Some(syn::parse_str(&s.value())?);
+            } else if meta.path.is_ident("flatten") {
+                attrs.flatten = true;
+            } else if meta.path.is_ident("json") {
+                attrs.json = true;
             } else {
                 return Err(meta.error("unknown sentinel attribute"));
             }
