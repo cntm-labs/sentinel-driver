@@ -175,9 +175,11 @@ fn impl_to_sql(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
 
     match &input.data {
         Data::Enum(data) => impl_to_sql_enum(name, generics, data, input),
-        Data::Struct(_) => {
-            get_single_field(input, "ToSql")?;
-            Ok(quote! {
+        Data::Struct(data) => match &data.fields {
+            Fields::Named(fields) if get_type_name(input).is_some() => {
+                impl_to_sql_composite(name, generics, fields, input)
+            }
+            Fields::Unnamed(fields) if fields.unnamed.len() == 1 => Ok(quote! {
                 impl #impl_generics sentinel_driver::ToSql for #name #ty_generics #where_clause {
                     fn oid(&self) -> sentinel_driver::Oid {
                         self.0.oid()
@@ -187,8 +189,12 @@ fn impl_to_sql(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
                         self.0.to_sql(buf)
                     }
                 }
-            })
-        }
+            }),
+            _ => Err(syn::Error::new_spanned(
+                input,
+                "ToSql requires a newtype struct or a named struct with #[sentinel(type_name = \"...\")]",
+            )),
+        },
         _ => Err(syn::Error::new_spanned(
             input,
             "ToSql can only be derived for structs or enums",
@@ -272,20 +278,29 @@ fn impl_from_sql(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
 
     match &input.data {
         Data::Enum(data) => impl_from_sql_enum(name, generics, data, input),
-        Data::Struct(_) => {
-            let inner_ty = get_single_field(input, "FromSql")?;
-            Ok(quote! {
-                impl #impl_generics sentinel_driver::FromSql for #name #ty_generics #where_clause {
-                    fn oid() -> sentinel_driver::Oid {
-                        <#inner_ty as sentinel_driver::FromSql>::oid()
-                    }
+        Data::Struct(data) => match &data.fields {
+            Fields::Named(fields) if get_type_name(input).is_some() => {
+                impl_from_sql_composite(name, generics, fields, input)
+            }
+            Fields::Unnamed(fields) if fields.unnamed.len() == 1 => {
+                let inner_ty = fields.unnamed.first().unwrap().ty.clone();
+                Ok(quote! {
+                    impl #impl_generics sentinel_driver::FromSql for #name #ty_generics #where_clause {
+                        fn oid() -> sentinel_driver::Oid {
+                            <#inner_ty as sentinel_driver::FromSql>::oid()
+                        }
 
-                    fn from_sql(buf: &[u8]) -> sentinel_driver::Result<Self> {
-                        <#inner_ty as sentinel_driver::FromSql>::from_sql(buf).map(Self)
+                        fn from_sql(buf: &[u8]) -> sentinel_driver::Result<Self> {
+                            <#inner_ty as sentinel_driver::FromSql>::from_sql(buf).map(Self)
+                        }
                     }
-                }
-            })
-        }
+                })
+            }
+            _ => Err(syn::Error::new_spanned(
+                input,
+                "FromSql requires a newtype struct or a named struct with #[sentinel(type_name = \"...\")]",
+            )),
+        },
         _ => Err(syn::Error::new_spanned(
             input,
             "FromSql can only be derived for structs or enums",
@@ -341,6 +356,120 @@ fn impl_from_sql_enum(
                         format!("unknown {} variant: '{}'", #type_name_str, other)
                     )),
                 }
+            }
+        }
+    })
+}
+
+// ── Composite Types ──────────────────────────────────
+
+fn impl_to_sql_composite(
+    name: &syn::Ident,
+    generics: &syn::Generics,
+    fields: &syn::FieldsNamed,
+    _input: &DeriveInput,
+) -> syn::Result<proc_macro2::TokenStream> {
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+    let field_count = fields.named.len() as i32;
+
+    let encode_fields = fields.named.iter().map(|f| {
+        let field_name = f.ident.as_ref().unwrap();
+        quote! {
+            {
+                let oid = sentinel_driver::ToSql::oid(&self.#field_name);
+                buf.put_u32(oid.0);
+                let len_pos = buf.len();
+                buf.put_i32(0); // placeholder
+                let data_start = buf.len();
+                sentinel_driver::ToSql::to_sql(&self.#field_name, buf)?;
+                let data_len = (buf.len() - data_start) as i32;
+                buf[len_pos..len_pos + 4].copy_from_slice(&data_len.to_be_bytes());
+            }
+        }
+    });
+
+    Ok(quote! {
+        impl #impl_generics sentinel_driver::ToSql for #name #ty_generics #where_clause {
+            fn oid(&self) -> sentinel_driver::Oid {
+                sentinel_driver::Oid::TEXT
+            }
+
+            fn to_sql(&self, buf: &mut bytes::BytesMut) -> sentinel_driver::Result<()> {
+                use bytes::BufMut;
+                buf.put_i32(#field_count);
+                #(#encode_fields)*
+                Ok(())
+            }
+        }
+    })
+}
+
+fn impl_from_sql_composite(
+    name: &syn::Ident,
+    generics: &syn::Generics,
+    fields: &syn::FieldsNamed,
+    _input: &DeriveInput,
+) -> syn::Result<proc_macro2::TokenStream> {
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+
+    let decode_fields = fields.named.iter().enumerate().map(|(i, f)| {
+        let field_name = f.ident.as_ref().unwrap();
+        let field_ty = &f.ty;
+        let idx = i;
+
+        quote! {
+            #field_name: {
+                if offset + 8 > buf.len() {
+                    return Err(sentinel_driver::Error::Decode(
+                        format!("composite: field {} truncated at offset {}", #idx, offset)
+                    ));
+                }
+                let _field_oid = u32::from_be_bytes([
+                    buf[offset], buf[offset + 1], buf[offset + 2], buf[offset + 3],
+                ]);
+                offset += 4;
+                let field_len = i32::from_be_bytes([
+                    buf[offset], buf[offset + 1], buf[offset + 2], buf[offset + 3],
+                ]);
+                offset += 4;
+                if field_len < 0 {
+                    return Err(sentinel_driver::Error::Decode(
+                        format!("composite: NULL not supported for field {}", #idx)
+                    ));
+                }
+                let field_len = field_len as usize;
+                if offset + field_len > buf.len() {
+                    return Err(sentinel_driver::Error::Decode(
+                        format!("composite: field {} data truncated", #idx)
+                    ));
+                }
+                let val = <#field_ty as sentinel_driver::FromSql>::from_sql(
+                    &buf[offset..offset + field_len],
+                )?;
+                offset += field_len;
+                val
+            }
+        }
+    });
+
+    Ok(quote! {
+        impl #impl_generics sentinel_driver::FromSql for #name #ty_generics #where_clause {
+            fn oid() -> sentinel_driver::Oid {
+                sentinel_driver::Oid::TEXT
+            }
+
+            fn from_sql(buf: &[u8]) -> sentinel_driver::Result<Self> {
+                if buf.len() < 4 {
+                    return Err(sentinel_driver::Error::Decode(
+                        "composite: too short".into(),
+                    ));
+                }
+                let _field_count = i32::from_be_bytes([buf[0], buf[1], buf[2], buf[3]]);
+                let mut offset = 4;
+
+                Ok(Self {
+                    #(#decode_fields,)*
+                })
             }
         }
     })
@@ -437,6 +566,29 @@ fn get_repr_type(input: &DeriveInput) -> Option<syn::Ident> {
                     return Some(ident);
                 }
             }
+        }
+    }
+    None
+}
+
+/// Parse `#[sentinel(type_name = "pg_type")]` attribute on a struct.
+fn get_type_name(input: &DeriveInput) -> Option<String> {
+    for attr in &input.attrs {
+        if !attr.path().is_ident("sentinel") {
+            continue;
+        }
+        let result: syn::Result<String> =
+            attr.parse_args_with(|input: syn::parse::ParseStream| {
+                let ident: syn::Ident = input.parse()?;
+                if ident != "type_name" {
+                    return Err(syn::Error::new_spanned(&ident, "expected `type_name`"));
+                }
+                let _: syn::Token![=] = input.parse()?;
+                let lit: syn::LitStr = input.parse()?;
+                Ok(lit.value())
+            });
+        if let Ok(name) = result {
+            return Some(name);
         }
     }
     None
@@ -563,26 +715,6 @@ fn get_variant_rename(variant: &syn::Variant) -> Option<String> {
     None
 }
 
-/// Extract the inner type from a newtype (struct with exactly one unnamed field).
-fn get_single_field(input: &DeriveInput, derive_name: &str) -> syn::Result<Type> {
-    match &input.data {
-        Data::Struct(data) => match &data.fields {
-            Fields::Unnamed(fields) if fields.unnamed.len() == 1 => {
-                Ok(fields.unnamed.first().unwrap().ty.clone())
-            }
-            _ => Err(syn::Error::new_spanned(
-                input,
-                format!(
-                    "{derive_name} can only be derived for newtype structs (e.g., struct Foo(i32))"
-                ),
-            )),
-        },
-        _ => Err(syn::Error::new_spanned(
-            input,
-            format!("{derive_name} can only be derived for structs"),
-        )),
-    }
-}
 
 /// All supported field-level `#[sentinel(...)]` attributes.
 struct FieldAttrs {
