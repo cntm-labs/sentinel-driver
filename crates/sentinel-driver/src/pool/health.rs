@@ -51,6 +51,12 @@ pub struct ConnectionMeta {
     pub is_broken: bool,
 }
 
+impl Default for ConnectionMeta {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ConnectionMeta {
     pub fn new() -> Self {
         let now = Instant::now();
