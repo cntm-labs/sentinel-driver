@@ -247,3 +247,103 @@ async fn test_query_stream_non_select_error() {
 
     conn.close().await.unwrap();
 }
+
+#[tokio::test]
+async fn test_query_stream_error_mid_stream() {
+    let url = require_pg!();
+    let config = Config::parse(&url).unwrap();
+    let mut conn = sentinel_driver::Connection::connect(config).await.unwrap();
+
+    // Volatile function that errors at x=1000.
+    // Called per-row from generate_series, PG sends DataRows as they're
+    // produced. By x=1000 some rows have already been flushed to client.
+    conn.simple_query(
+        "CREATE OR REPLACE FUNCTION _volatile_bomb(int) RETURNS int AS $$ \
+         BEGIN \
+           IF $1 = 1000 THEN RAISE EXCEPTION 'boom at 1000'; END IF; \
+           RETURN $1; \
+         END; \
+         $$ LANGUAGE plpgsql VOLATILE",
+    )
+    .await
+    .unwrap();
+
+    let mut stream = conn
+        .query_stream(
+            "SELECT _volatile_bomb(x::int) FROM generate_series(1, 2000) AS x",
+            &[],
+        )
+        .await
+        .unwrap();
+
+    // Read rows until we hit the ErrorResponse
+    let mut row_count = 0u32;
+    let mut got_error = false;
+    loop {
+        match stream.next().await {
+            Ok(Some(_)) => row_count += 1,
+            Ok(None) => break,
+            Err(_) => {
+                got_error = true;
+                break;
+            }
+        }
+    }
+
+    // We should have received some rows before the error
+    assert!(row_count > 0, "expected some rows before error");
+    assert!(got_error, "expected mid-stream error");
+    assert!(stream.is_done());
+
+    // Connection should still be usable after mid-stream error
+    let rows = conn.query("SELECT 1 AS ok", &[]).await.unwrap();
+    assert_eq!(rows[0].get::<i32>(0), 1);
+
+    conn.close().await.unwrap();
+}
+
+#[tokio::test]
+async fn test_query_stream_close_already_done() {
+    let url = require_pg!();
+    let config = Config::parse(&url).unwrap();
+    let mut conn = sentinel_driver::Connection::connect(config).await.unwrap();
+
+    let mut stream = conn.query_stream("SELECT 1 AS x", &[]).await.unwrap();
+
+    // Fully consume the stream
+    let row = stream.next().await.unwrap().unwrap();
+    assert_eq!(row.get::<i32>(0), 1);
+    assert!(stream.next().await.unwrap().is_none());
+    assert!(stream.is_done());
+
+    // close() on an already-done stream is a no-op
+    stream.close().await.unwrap();
+
+    // Connection still usable
+    let rows = conn.query("SELECT 2 AS ok", &[]).await.unwrap();
+    assert_eq!(rows[0].get::<i32>(0), 2);
+
+    conn.close().await.unwrap();
+}
+
+#[tokio::test]
+async fn test_query_stream_large_result_set() {
+    let url = require_pg!();
+    let config = Config::parse(&url).unwrap();
+    let mut conn = sentinel_driver::Connection::connect(config).await.unwrap();
+
+    // Stream 10,000 rows to verify streaming works at scale
+    let mut stream = conn
+        .query_stream("SELECT x FROM generate_series(1, 10000) AS x", &[])
+        .await
+        .unwrap();
+
+    let mut count = 0i32;
+    while let Some(row) = stream.next().await.unwrap() {
+        count += 1;
+        assert_eq!(row.get::<i32>(0), count);
+    }
+    assert_eq!(count, 10000);
+
+    conn.close().await.unwrap();
+}
