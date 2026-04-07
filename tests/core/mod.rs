@@ -5,7 +5,7 @@ mod config;
 mod copy_binary;
 mod copy_text;
 mod notify_channel;
-mod pool_health;
+mod pool;
 mod protocol_backend;
 mod protocol_codec;
 mod protocol_frontend;
