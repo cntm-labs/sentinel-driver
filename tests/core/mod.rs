@@ -4,6 +4,7 @@ mod config;
 mod copy_binary;
 mod copy_text;
 mod notify_channel;
+mod pool_callbacks;
 mod pool_health;
 mod protocol_backend;
 mod protocol_codec;

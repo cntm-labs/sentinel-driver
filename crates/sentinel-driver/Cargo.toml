@@ -41,6 +41,9 @@ thiserror = "2"
 # Logging
 tracing = "0.1"
 
+# Async callback types (BoxFuture)
+futures-core = "0.3"
+
 # LRU cache for prepared statements
 lru = "0.12"
 

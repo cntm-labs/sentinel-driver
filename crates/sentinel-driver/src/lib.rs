@@ -490,6 +490,37 @@ impl Connection {
         self.conn.close().await
     }
 
+    // ── Internal constructors (for pool) ──────────────
+
+    /// Create a Connection from raw parts after startup handshake.
+    ///
+    /// Used by the connection pool which manages the connect + startup
+    /// lifecycle separately.
+    pub(crate) fn from_raw_parts(
+        conn: PgConnection,
+        config: Config,
+        process_id: i32,
+        secret_key: i32,
+        transaction_status: TransactionStatus,
+    ) -> Self {
+        let query_timeout = config.statement_timeout();
+        Self {
+            conn,
+            config,
+            process_id,
+            secret_key,
+            transaction_status,
+            stmt_cache: StatementCache::new(),
+            query_timeout,
+            is_broken: false,
+        }
+    }
+
+    /// Access the underlying PgConnection mutably.
+    pub(crate) fn pg_connection_mut(&mut self) -> &mut PgConnection {
+        &mut self.conn
+    }
+
     // ── Internal ─────────────────────────────────────
 
     async fn query_internal(
