@@ -1,3 +1,5 @@
+mod stream;
+
 use std::time::Duration;
 
 use sentinel_driver::pool::config::PoolConfig;

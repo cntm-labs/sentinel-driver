@@ -1,8 +1,31 @@
+# Build artifacts
 /target
-Cargo.lock
-.worktrees/
+
+# Environment and Secrets
 .env
+.env.*
+!.env.example
+
+# Version Control
+.worktrees/
+
+# Documentation
+/docs
+
+# IDEs and Editors
 .vscode/
 .idea/
+*.swp
 *.vim
 *.vi
+
+# OS Specific (macOS)
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+
+
+# Rust extras
+Cargo.lock
+*.rs.bk

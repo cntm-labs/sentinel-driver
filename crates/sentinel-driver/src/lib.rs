@@ -46,6 +46,7 @@ pub mod pool;
 pub mod protocol;
 pub mod row;
 pub mod statement;
+pub mod stream;
 pub mod tls;
 pub mod transaction;
 pub mod types;
@@ -63,6 +64,7 @@ pub use notify::Notification;
 pub use pool::Pool;
 pub use row::{CommandResult, Row, RowDescription};
 pub use statement::Statement;
+pub use stream::RowStream;
 pub use transaction::{IsolationLevel, TransactionConfig};
 pub use types::{FromSql, Oid, ToSql};
 
