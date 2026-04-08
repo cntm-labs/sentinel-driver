@@ -7,6 +7,7 @@ mod derive;
 mod notify;
 mod pipeline;
 mod pool;
+mod pool_callbacks;
 mod protocol;
 mod row;
 mod statement;

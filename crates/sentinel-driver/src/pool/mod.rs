@@ -13,10 +13,11 @@ use crate::connection::stream::PgConnection;
 use crate::error::{Error, Result};
 use crate::pool::config::PoolConfig;
 use crate::pool::health::{ConnectionMeta, HealthCheckStrategy};
+use crate::Connection;
 
 /// An idle connection in the pool, with its metadata.
 struct IdleConnection {
-    conn: PgConnection,
+    conn: Connection,
     meta: ConnectionMeta,
 }
 
@@ -39,6 +40,13 @@ struct PoolShared {
 /// Cheaply cloneable (internally Arc'd). Uses a semaphore to limit max
 /// connections and a mutex-protected deque for idle connection management.
 /// Designed for <0.5μs checkout latency.
+///
+/// # Lifecycle Callbacks
+///
+/// Three optional callbacks control connection lifecycle:
+/// - `after_connect` — runs once per new connection (session setup)
+/// - `before_acquire` — runs before handing out a connection (validation)
+/// - `after_release` — runs when a connection returns to the pool (cleanup)
 ///
 /// # Example
 ///
@@ -77,6 +85,25 @@ impl Pool {
         Self { shared }
     }
 
+    /// Create a pool that defers all connection establishment until the
+    /// first `acquire()` call.
+    ///
+    /// This is identical to `new()` — both are lazy. Provided for API
+    /// compatibility with connection pools that eagerly open connections.
+    ///
+    /// ```rust,no_run
+    /// # use sentinel_driver::{Config, pool::{Pool, config::PoolConfig}};
+    /// # fn example() -> sentinel_driver::Result<()> {
+    /// let config = Config::parse("postgres://user:pass@localhost/db")?;
+    /// let pool = Pool::connect_lazy(config, PoolConfig::new());
+    /// // No connections opened yet — first acquire() will connect.
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn connect_lazy(config: Config, pool_config: PoolConfig) -> Self {
+        Self::new(config, pool_config)
+    }
+
     /// Acquire a connection from the pool.
     ///
     /// If an idle connection is available, it's returned immediately.
@@ -106,7 +133,7 @@ impl Pool {
                 let mut conn = idle.conn;
                 // If Query strategy, verify connection is alive
                 if self.shared.pool_config.health_check == HealthCheckStrategy::Query
-                    && !health::check_alive(&mut conn).await
+                    && !health::check_alive(conn.pg_connection_mut()).await
                 {
                     debug!("idle connection failed health check, creating new one");
                     self.decrement_count().await;
@@ -117,6 +144,34 @@ impl Pool {
                         shared: Arc::clone(&self.shared),
                     });
                 }
+
+                // Run before_acquire callback
+                if let Some(ref cb) = self.shared.pool_config.before_acquire {
+                    match cb(&mut conn).await {
+                        Ok(true) => { /* connection accepted */ }
+                        Ok(false) => {
+                            debug!("before_acquire rejected connection");
+                            self.decrement_count().await;
+                            let (conn, meta) = self.create_connection().await?;
+                            return Ok(PooledConnection {
+                                conn: Some(conn),
+                                meta,
+                                shared: Arc::clone(&self.shared),
+                            });
+                        }
+                        Err(_) => {
+                            debug!("before_acquire callback error, discarding connection");
+                            self.decrement_count().await;
+                            let (conn, meta) = self.create_connection().await?;
+                            return Ok(PooledConnection {
+                                conn: Some(conn),
+                                meta,
+                                shared: Arc::clone(&self.shared),
+                            });
+                        }
+                    }
+                }
+
                 debug!("reusing idle connection");
                 Ok(PooledConnection {
                     conn: Some(conn),
@@ -160,9 +215,25 @@ impl Pool {
 
     // ── Internal ─────────────────────────────────────
 
-    async fn create_connection(&self) -> Result<(PgConnection, ConnectionMeta)> {
-        let mut conn = PgConnection::connect(&self.shared.config).await?;
-        startup::startup(&mut conn, &self.shared.config).await?;
+    async fn create_connection(&self) -> Result<(Connection, ConnectionMeta)> {
+        let mut pg_conn = PgConnection::connect(&self.shared.config).await?;
+        let result = startup::startup(&mut pg_conn, &self.shared.config).await?;
+
+        let mut conn = Connection::from_raw_parts(
+            pg_conn,
+            self.shared.config.clone(),
+            result.process_id,
+            result.secret_key,
+            result.transaction_status,
+        );
+
+        // Run after_connect callback
+        if let Some(ref cb) = self.shared.pool_config.after_connect {
+            if let Err(e) = cb(&mut conn).await {
+                debug!(?e, "after_connect callback failed, discarding connection");
+                return Err(e);
+            }
+        }
 
         let meta = ConnectionMeta::new();
 
@@ -202,9 +273,10 @@ impl Pool {
 /// A connection checked out from the pool.
 ///
 /// When dropped, the connection is automatically returned to the pool
-/// (unless it has been marked as broken).
+/// (unless it has been marked as broken). The `after_release` callback
+/// runs before the connection re-enters the idle queue.
 pub struct PooledConnection {
-    conn: Option<PgConnection>,
+    conn: Option<Connection>,
     meta: ConnectionMeta,
     shared: Arc<PoolShared>,
 }
@@ -231,7 +303,30 @@ impl Drop for PooledConnection {
                 });
             } else {
                 let created_at = self.meta.created_at;
+                let after_release = self.shared.pool_config.after_release.clone();
+
                 tokio::spawn(async move {
+                    let mut conn = conn;
+
+                    // Run after_release callback
+                    if let Some(cb) = after_release {
+                        match cb(&mut conn).await {
+                            Ok(true) => { /* return to pool */ }
+                            Ok(false) => {
+                                debug!("after_release rejected connection, discarding");
+                                let mut state = shared.state.lock().await;
+                                state.total_count = state.total_count.saturating_sub(1);
+                                return;
+                            }
+                            Err(_) => {
+                                debug!("after_release callback error, discarding connection");
+                                let mut state = shared.state.lock().await;
+                                state.total_count = state.total_count.saturating_sub(1);
+                                return;
+                            }
+                        }
+                    }
+
                     let mut meta = ConnectionMeta::new();
                     meta.created_at = created_at;
                     meta.touch();
