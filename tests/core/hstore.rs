@@ -64,3 +64,66 @@ fn test_hstore_decode_truncated() {
     let result: sentinel_driver::Result<HashMap<String, Option<String>>> = FromSql::from_sql(&[0]);
     assert!(result.is_err());
 }
+
+#[test]
+fn test_hstore_decode_negative_count() {
+    let data = (-1i32).to_be_bytes();
+    let result: sentinel_driver::Result<HashMap<String, Option<String>>> = FromSql::from_sql(&data);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_hstore_decode_truncated_key_length() {
+    // count=1 but no key length bytes after
+    let mut data = Vec::new();
+    data.extend_from_slice(&1i32.to_be_bytes()); // count = 1
+    let result: sentinel_driver::Result<HashMap<String, Option<String>>> = FromSql::from_sql(&data);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_hstore_decode_truncated_key_data() {
+    let mut data = Vec::new();
+    data.extend_from_slice(&1i32.to_be_bytes()); // count = 1
+    data.extend_from_slice(&10i32.to_be_bytes()); // key_len = 10
+    data.extend_from_slice(b"short"); // only 5 bytes, need 10
+    let result: sentinel_driver::Result<HashMap<String, Option<String>>> = FromSql::from_sql(&data);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_hstore_decode_truncated_value_length() {
+    let mut data = Vec::new();
+    data.extend_from_slice(&1i32.to_be_bytes()); // count = 1
+    data.extend_from_slice(&3i32.to_be_bytes()); // key_len = 3
+    data.extend_from_slice(b"key"); // key data
+                                    // missing value length
+    let result: sentinel_driver::Result<HashMap<String, Option<String>>> = FromSql::from_sql(&data);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_hstore_decode_truncated_value_data() {
+    let mut data = Vec::new();
+    data.extend_from_slice(&1i32.to_be_bytes()); // count = 1
+    data.extend_from_slice(&3i32.to_be_bytes()); // key_len = 3
+    data.extend_from_slice(b"key"); // key data
+    data.extend_from_slice(&10i32.to_be_bytes()); // val_len = 10
+    data.extend_from_slice(b"short"); // only 5 bytes
+    let result: sentinel_driver::Result<HashMap<String, Option<String>>> = FromSql::from_sql(&data);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_hstore_oid() {
+    let map: HashMap<String, Option<String>> = HashMap::new();
+    assert_eq!(map.oid(), sentinel_driver::Oid::TEXT);
+}
+
+#[test]
+fn test_hstore_from_sql_oid() {
+    assert_eq!(
+        <HashMap<String, Option<String>> as FromSql>::oid(),
+        sentinel_driver::Oid::TEXT
+    );
+}

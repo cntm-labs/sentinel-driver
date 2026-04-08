@@ -83,6 +83,41 @@ fn test_log_slow_query_below_threshold() {
 }
 
 #[test]
+fn test_log_slow_query_above_threshold() {
+    // Above threshold — logs warning (doesn't panic)
+    sentinel_driver::observability::log_slow_query(
+        "SELECT * FROM big_table",
+        Duration::from_millis(500),
+        Duration::from_millis(100),
+    );
+}
+
+#[test]
+fn test_log_slow_query_long_sql_truncated() {
+    let long_sql = "SELECT ".to_string() + &"x".repeat(300);
+    sentinel_driver::observability::log_slow_query(
+        &long_sql,
+        Duration::from_millis(500),
+        Duration::from_millis(100),
+    );
+}
+
+#[test]
 fn test_query_span_creation() {
     let _span = sentinel_driver::observability::query_span("SELECT * FROM users");
+}
+
+#[test]
+fn test_query_span_long_sql_truncated() {
+    let long_sql = "SELECT ".to_string() + &"x".repeat(200);
+    let _span = sentinel_driver::observability::query_span(&long_sql);
+}
+
+#[test]
+fn test_observability_config_clone() {
+    let config = ObservabilityConfig {
+        slow_query_threshold: Some(Duration::from_millis(100)),
+        on_query: None,
+    };
+    let _cloned = config.clone();
 }
