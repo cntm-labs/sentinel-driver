@@ -63,6 +63,7 @@ workspace = true
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }
+criterion = { version = "0.5", features = ["html_reports"] }
 
 [[test]]
 name = "core_tests"
@@ -71,3 +72,8 @@ path = "../../tests/core_tests.rs"
 [[test]]
 name = "postgres_tests"
 path = "../../tests/postgres_tests.rs"
+
+[[bench]]
+name = "driver_bench"
+harness = false
+path = "../../benches/driver_bench.rs"

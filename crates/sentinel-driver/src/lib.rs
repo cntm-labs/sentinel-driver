@@ -33,6 +33,7 @@
 //! # }
 //! ```
 
+pub mod advisory_lock;
 pub mod auth;
 pub mod cache;
 pub mod cancel;
@@ -41,8 +42,10 @@ pub mod connection;
 pub mod copy;
 pub mod error;
 pub mod notify;
+pub mod observability;
 pub mod pipeline;
 pub mod pool;
+pub mod portal;
 pub mod protocol;
 pub mod row;
 pub mod statement;
@@ -53,15 +56,18 @@ pub mod types;
 
 // ── Public re-exports ────────────────────────────────
 
+pub use advisory_lock::{PgAdvisoryLock, PgAdvisoryLockGuard};
 pub use cache::{CacheMetrics, StatementCache};
 pub use cancel::CancelToken;
-pub use config::{Config, SslMode};
+pub use config::{ChannelBinding, Config, SslMode};
 pub use connection::Connection;
 pub use copy::binary::{BinaryCopyDecoder, BinaryCopyEncoder};
 pub use copy::text::{TextCopyDecoder, TextCopyEncoder};
 pub use error::{Error, Result};
 pub use notify::Notification;
-pub use pool::{Pool, PooledConnection};
+pub use observability::{ObservabilityConfig, QueryMetrics, QueryMetricsCallback};
+pub use pool::{Pool, PoolMetrics, PooledConnection};
+pub use portal::Portal;
 pub use row::{CommandResult, Row, RowDescription};
 pub use statement::Statement;
 pub use stream::RowStream;

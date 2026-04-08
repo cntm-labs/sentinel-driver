@@ -5,6 +5,7 @@ mod client;
 mod copy_impl;
 mod notify_impl;
 mod pipeline_impl;
+mod portal_impl;
 mod prepare;
 mod query;
 mod stream_impl;
