@@ -2,6 +2,7 @@ pub mod config;
 pub mod health;
 
 use std::collections::VecDeque;
+use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
 use tokio::sync::{Mutex, Semaphore};
@@ -286,6 +287,26 @@ impl PooledConnection {
     /// instead of being returned to the pool.
     pub fn mark_broken(&mut self) {
         self.meta.is_broken = true;
+    }
+}
+
+impl Deref for PooledConnection {
+    type Target = Connection;
+
+    #[allow(clippy::expect_used)]
+    fn deref(&self) -> &Self::Target {
+        self.conn
+            .as_ref()
+            .expect("PooledConnection used after drop")
+    }
+}
+
+impl DerefMut for PooledConnection {
+    #[allow(clippy::expect_used)]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.conn
+            .as_mut()
+            .expect("PooledConnection used after drop")
     }
 }
 

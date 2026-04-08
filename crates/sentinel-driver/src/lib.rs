@@ -61,7 +61,7 @@ pub use copy::binary::{BinaryCopyDecoder, BinaryCopyEncoder};
 pub use copy::text::{TextCopyDecoder, TextCopyEncoder};
 pub use error::{Error, Result};
 pub use notify::Notification;
-pub use pool::Pool;
+pub use pool::{Pool, PooledConnection};
 pub use row::{CommandResult, Row, RowDescription};
 pub use statement::Statement;
 pub use stream::RowStream;
