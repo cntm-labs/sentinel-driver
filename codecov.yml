@@ -22,3 +22,4 @@ ignore:
   - "crates/sentinel-driver/src/stream.rs"
   - "crates/sentinel-driver/src/portal.rs"
   - "crates/sentinel-driver/src/advisory_lock.rs"
+  - "crates/sentinel-driver/src/observability.rs"

@@ -127,3 +127,35 @@ fn test_hstore_from_sql_oid() {
         sentinel_driver::Oid::TEXT
     );
 }
+
+#[test]
+fn test_hstore_decode_negative_key_length() {
+    let mut data = Vec::new();
+    data.extend_from_slice(&1i32.to_be_bytes()); // count = 1
+    data.extend_from_slice(&(-1i32).to_be_bytes()); // key_len = -1 (invalid)
+    let result: sentinel_driver::Result<HashMap<String, Option<String>>> = FromSql::from_sql(&data);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_hstore_decode_invalid_utf8_key() {
+    let mut data = Vec::new();
+    data.extend_from_slice(&1i32.to_be_bytes()); // count = 1
+    data.extend_from_slice(&2i32.to_be_bytes()); // key_len = 2
+    data.extend_from_slice(&[0xFF, 0xFE]); // invalid UTF-8
+    data.extend_from_slice(&(-1i32).to_be_bytes()); // val = NULL
+    let result: sentinel_driver::Result<HashMap<String, Option<String>>> = FromSql::from_sql(&data);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_hstore_decode_invalid_utf8_value() {
+    let mut data = Vec::new();
+    data.extend_from_slice(&1i32.to_be_bytes()); // count = 1
+    data.extend_from_slice(&3i32.to_be_bytes()); // key_len = 3
+    data.extend_from_slice(b"key"); // valid key
+    data.extend_from_slice(&2i32.to_be_bytes()); // val_len = 2
+    data.extend_from_slice(&[0xFF, 0xFE]); // invalid UTF-8 value
+    let result: sentinel_driver::Result<HashMap<String, Option<String>>> = FromSql::from_sql(&data);
+    assert!(result.is_err());
+}
