@@ -42,3 +42,10 @@ fn test_health_check_strategy_variants() {
     let none = HealthCheckStrategy::None;
     assert_eq!(none, HealthCheckStrategy::None);
 }
+
+#[test]
+fn test_connection_meta_default() {
+    let meta = ConnectionMeta::default();
+    assert!(!meta.is_broken);
+    assert!(meta.created_at.elapsed() < Duration::from_secs(1));
+}

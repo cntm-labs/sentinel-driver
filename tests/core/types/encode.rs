@@ -1,6 +1,6 @@
 use bytes::BytesMut;
 
-use sentinel_driver::types::ToSql;
+use sentinel_driver::types::{encode_param, encode_param_nullable, FromSql, Oid, ToSql};
 
 #[test]
 fn test_encode_bool() {
@@ -214,4 +214,77 @@ fn test_encode_timestamp() {
     let mut buf = BytesMut::new();
     dt.to_sql(&mut buf).unwrap();
     assert_eq!(&buf[..], &0i64.to_be_bytes());
+}
+
+#[test]
+fn test_option_some_to_sql() {
+    let val: Option<i32> = Some(42);
+    assert_eq!(val.oid(), Oid::INT4);
+
+    let mut buf = BytesMut::new();
+    val.to_sql(&mut buf).unwrap();
+    assert_eq!(&buf[..], &42i32.to_be_bytes());
+}
+
+#[test]
+fn test_option_none_to_sql() {
+    let val: Option<i32> = None;
+    assert_eq!(val.oid(), Oid::TEXT); // defaults to TEXT for NULL
+
+    let mut buf = BytesMut::new();
+    val.to_sql(&mut buf).unwrap();
+    assert!(buf.is_empty());
+}
+
+#[test]
+fn test_option_some_from_sql() {
+    let data = 42i32.to_be_bytes();
+    let val: Option<i32> = FromSql::from_sql(&data).unwrap();
+    assert_eq!(val, Some(42));
+}
+
+#[test]
+fn test_option_none_from_sql_nullable() {
+    let val: Option<i32> = FromSql::from_sql_nullable(None).unwrap();
+    assert_eq!(val, None);
+}
+
+#[test]
+fn test_option_some_from_sql_nullable() {
+    let data = 42i32.to_be_bytes();
+    let val: Option<i32> = FromSql::from_sql_nullable(Some(&data)).unwrap();
+    assert_eq!(val, Some(42));
+}
+
+#[test]
+fn test_from_sql_nullable_null_error() {
+    let result: sentinel_driver::Result<i32> = FromSql::from_sql_nullable(None);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_to_sql_vec() {
+    let vec = 42i32.to_sql_vec().unwrap();
+    assert_eq!(vec, 42i32.to_be_bytes().to_vec());
+}
+
+#[test]
+fn test_encode_param() {
+    let vec = encode_param(&42i32).unwrap();
+    assert_eq!(vec, 42i32.to_be_bytes().to_vec());
+}
+
+#[test]
+fn test_encode_param_nullable_some() {
+    let val: Option<i32> = Some(42);
+    let result = encode_param_nullable(&val).unwrap();
+    assert!(result.is_some());
+    assert_eq!(result.unwrap(), 42i32.to_be_bytes().to_vec());
+}
+
+#[test]
+fn test_encode_param_nullable_none() {
+    let val: Option<i32> = None;
+    let result = encode_param_nullable(&val).unwrap();
+    assert!(result.is_none());
 }
