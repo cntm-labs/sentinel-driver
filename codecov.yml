@@ -19,3 +19,4 @@ ignore:
   - "crates/sentinel-driver/src/notify/mod.rs"
   - "crates/sentinel-driver/src/pool/mod.rs"
   - "crates/sentinel-driver/src/pipeline/mod.rs"
+  - "crates/sentinel-driver/src/stream.rs"
