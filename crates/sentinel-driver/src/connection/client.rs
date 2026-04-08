@@ -111,9 +111,13 @@ impl Connection {
         let mut encoded_params: Vec<Option<Vec<u8>>> = Vec::with_capacity(params.len());
 
         for param in params {
-            let mut buf = BytesMut::new();
-            param.to_sql(&mut buf)?;
-            encoded_params.push(Some(buf.to_vec()));
+            if param.is_null() {
+                encoded_params.push(None);
+            } else {
+                let mut buf = BytesMut::new();
+                param.to_sql(&mut buf)?;
+                encoded_params.push(Some(buf.to_vec()));
+            }
         }
 
         // Use pipeline for single query (same protocol, consistent code path)
