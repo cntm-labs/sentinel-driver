@@ -33,16 +33,16 @@ pub type ReleaseCallback =
 /// All callbacks are optional and default to `None`.
 #[derive(Clone)]
 pub struct PoolConfig {
-    pub(crate) max_connections: usize,
-    pub(crate) min_connections: usize,
-    pub(crate) connect_timeout: Duration,
-    pub(crate) idle_timeout: Option<Duration>,
-    pub(crate) max_lifetime: Option<Duration>,
-    pub(crate) health_check: HealthCheckStrategy,
-    pub(crate) acquire_timeout: Duration,
-    pub(crate) after_connect: Option<ConnectCallback>,
-    pub(crate) before_acquire: Option<AcquireCallback>,
-    pub(crate) after_release: Option<ReleaseCallback>,
+    pub max_connections: usize,
+    pub min_connections: usize,
+    pub connect_timeout: Duration,
+    pub idle_timeout: Option<Duration>,
+    pub max_lifetime: Option<Duration>,
+    pub health_check: HealthCheckStrategy,
+    pub acquire_timeout: Duration,
+    pub after_connect: Option<ConnectCallback>,
+    pub before_acquire: Option<AcquireCallback>,
+    pub after_release: Option<ReleaseCallback>,
 }
 
 impl fmt::Debug for PoolConfig {
@@ -219,40 +219,4 @@ impl PoolConfig {
 
 fn num_cpus() -> usize {
     std::thread::available_parallelism().map_or(8, |n| n.get() * 2)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_pool_config_defaults() {
-        let config = PoolConfig::new();
-        assert!(config.max_connections >= 2);
-        assert_eq!(config.min_connections, 1);
-        assert_eq!(config.connect_timeout, Duration::from_secs(10));
-        assert_eq!(config.idle_timeout, Some(Duration::from_secs(600)));
-        assert_eq!(config.max_lifetime, Some(Duration::from_secs(3600)));
-        assert_eq!(config.acquire_timeout, Duration::from_secs(30));
-    }
-
-    #[test]
-    fn test_pool_config_builder() {
-        let config = PoolConfig::new()
-            .max_connections(20)
-            .min_connections(5)
-            .connect_timeout(Duration::from_secs(5))
-            .idle_timeout(None)
-            .max_lifetime(Some(Duration::from_secs(7200)))
-            .health_check(HealthCheckStrategy::Query)
-            .acquire_timeout(Duration::from_secs(10));
-
-        assert_eq!(config.max_connections, 20);
-        assert_eq!(config.min_connections, 5);
-        assert_eq!(config.connect_timeout, Duration::from_secs(5));
-        assert_eq!(config.idle_timeout, None);
-        assert_eq!(config.max_lifetime, Some(Duration::from_secs(7200)));
-        assert!(matches!(config.health_check, HealthCheckStrategy::Query));
-        assert_eq!(config.acquire_timeout, Duration::from_secs(10));
-    }
 }

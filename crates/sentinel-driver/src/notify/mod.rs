@@ -164,7 +164,7 @@ pub(crate) async fn wait_for_notification(conn: &mut PgConnection) -> Result<Not
 }
 
 /// Validate that a channel name is safe to use in SQL.
-fn validate_channel_name(name: &str) -> Result<()> {
+pub fn validate_channel_name(name: &str) -> Result<()> {
     if name.is_empty() {
         return Err(Error::Config("channel name cannot be empty".into()));
     }
@@ -177,12 +177,12 @@ fn validate_channel_name(name: &str) -> Result<()> {
 }
 
 /// Quote an identifier for safe use in SQL (double-quote escaping).
-pub(crate) fn quote_identifier(name: &str) -> String {
+pub fn quote_identifier(name: &str) -> String {
     format!("\"{}\"", name.replace('"', "\"\""))
 }
 
 /// Quote a string literal for safe use in SQL (single-quote escaping).
-fn quote_literal(val: &str) -> String {
+pub fn quote_literal(val: &str) -> String {
     format!("'{}'", val.replace('\'', "''"))
 }
 
@@ -191,44 +191,5 @@ async fn drain_until_ready(conn: &mut PgConnection) -> Result<()> {
         if let BackendMessage::ReadyForQuery { .. } = conn.recv().await? {
             return Ok(());
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_validate_channel_name() {
-        assert!(validate_channel_name("my_channel").is_ok());
-        assert!(validate_channel_name("").is_err());
-        assert!(validate_channel_name(&"x".repeat(64)).is_err());
-        assert!(validate_channel_name(&"x".repeat(63)).is_ok());
-    }
-
-    #[test]
-    fn test_quote_identifier() {
-        assert_eq!(quote_identifier("simple"), "\"simple\"");
-        assert_eq!(quote_identifier("has\"quote"), "\"has\"\"quote\"");
-        assert_eq!(quote_identifier("MiXeD"), "\"MiXeD\"");
-    }
-
-    #[test]
-    fn test_quote_literal() {
-        assert_eq!(quote_literal("hello"), "'hello'");
-        assert_eq!(quote_literal("it's"), "'it''s'");
-        assert_eq!(quote_literal(""), "''");
-    }
-
-    #[test]
-    fn test_notification_struct() {
-        let n = Notification {
-            process_id: 123,
-            channel: "test_channel".to_string(),
-            payload: "hello world".to_string(),
-        };
-        assert_eq!(n.process_id, 123);
-        assert_eq!(n.channel, "test_channel");
-        assert_eq!(n.payload, "hello world");
     }
 }

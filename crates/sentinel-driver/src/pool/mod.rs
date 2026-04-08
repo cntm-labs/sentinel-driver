@@ -338,16 +338,3 @@ impl Drop for PooledConnection {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::config::PoolConfig;
-
-    #[test]
-    fn test_pool_config_creation() {
-        let config = PoolConfig::new().max_connections(10).min_connections(2);
-
-        assert_eq!(config.max_connections, 10);
-        assert_eq!(config.min_connections, 2);
-    }
-}
