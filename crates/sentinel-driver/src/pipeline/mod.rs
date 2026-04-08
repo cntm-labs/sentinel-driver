@@ -11,7 +11,7 @@ use crate::row::{parse_command_tag, CommandResult, Row, RowDescription};
 
 /// A single query in a pipeline with its bound parameters.
 #[derive(Debug)]
-pub(crate) struct PipelineQuery {
+pub struct PipelineQuery {
     pub sql: String,
     pub param_types: Vec<u32>,
     pub params: Vec<Option<Vec<u8>>>,
@@ -52,7 +52,7 @@ impl QueryResult {
 ///
 /// Each query gets: Parse (unnamed) → Bind → Describe → Execute
 /// A single Sync is appended at the end (single pipeline barrier).
-pub(crate) fn encode_pipeline(buf: &mut BytesMut, queries: &[PipelineQuery]) {
+pub fn encode_pipeline(buf: &mut BytesMut, queries: &[PipelineQuery]) {
     for q in queries {
         // Parse with unnamed statement ("")
         let oids: Vec<u32> = q.param_types.clone();

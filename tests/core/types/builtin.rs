@@ -19,3 +19,15 @@ fn test_lookup_unknown() {
     assert!(lookup(Oid(99999)).is_none());
     assert!(lookup_by_name("nonexistent").is_none());
 }
+
+#[test]
+fn test_oid_from_u32() {
+    let oid = Oid::from(23u32);
+    assert_eq!(oid, Oid::INT4);
+}
+
+#[test]
+fn test_u32_from_oid() {
+    let val: u32 = Oid::INT4.into();
+    assert_eq!(val, 23);
+}

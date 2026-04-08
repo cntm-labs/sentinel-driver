@@ -157,13 +157,13 @@ pub(crate) async fn authenticate(
     }
 }
 
-struct ServerFirst {
-    nonce: String,
-    salt: String,
-    iterations: u32,
+pub struct ServerFirst {
+    pub nonce: String,
+    pub salt: String,
+    pub iterations: u32,
 }
 
-fn parse_server_first(msg: &str) -> Result<ServerFirst> {
+pub fn parse_server_first(msg: &str) -> Result<ServerFirst> {
     let mut nonce = None;
     let mut salt = None;
     let mut iterations = None;
@@ -190,7 +190,7 @@ fn parse_server_first(msg: &str) -> Result<ServerFirst> {
 }
 
 /// Hi(password, salt, iterations) — PBKDF2-HMAC-SHA256.
-fn hi(password: &[u8], salt: &[u8], iterations: u32) -> Vec<u8> {
+pub fn hi(password: &[u8], salt: &[u8], iterations: u32) -> Vec<u8> {
     // U1 = HMAC(password, salt + INT(1))
     let mut salt_with_one = salt.to_vec();
     salt_with_one.extend_from_slice(&1u32.to_be_bytes());
@@ -209,7 +209,7 @@ fn hi(password: &[u8], salt: &[u8], iterations: u32) -> Vec<u8> {
     result
 }
 
-fn hmac_sha256(key: &[u8], data: &[u8]) -> Vec<u8> {
+pub fn hmac_sha256(key: &[u8], data: &[u8]) -> Vec<u8> {
     #[allow(clippy::expect_used)]
     let mut mac = HmacSha256::new_from_slice(key).expect("HMAC accepts any key length");
     mac.update(data);
@@ -226,76 +226,16 @@ fn sha256(data: &[u8]) -> Vec<u8> {
 ///
 /// This is what sqlx gets wrong — they skip this step, leading to
 /// authentication failures with non-ASCII passwords.
-fn saslprep(input: &str) -> Result<String> {
+pub fn saslprep(input: &str) -> Result<String> {
     stringprep::saslprep(input)
         .map(std::borrow::Cow::into_owned)
         .map_err(|e| Error::Auth(format!("SASLprep failed: {e}")))
 }
 
 /// Generate a random nonce for SCRAM.
-fn generate_nonce() -> String {
+pub fn generate_nonce() -> String {
     use rand::Rng;
     let mut rng = rand::thread_rng();
     let bytes: Vec<u8> = (0..24).map(|_| rng.gen()).collect();
     BASE64.encode(&bytes)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_parse_server_first() {
-        let msg = "r=clientNonce+serverNonce,s=c2FsdA==,i=4096";
-        let parsed = parse_server_first(msg).unwrap();
-        assert_eq!(parsed.nonce, "clientNonce+serverNonce");
-        assert_eq!(parsed.salt, "c2FsdA==");
-        assert_eq!(parsed.iterations, 4096);
-    }
-
-    #[test]
-    fn test_hi_known_vector() {
-        // RFC 5802 test vector for SCRAM-SHA-1, adapted:
-        // We test that Hi produces deterministic output for given inputs.
-        let result = hi(b"password", b"salt", 1);
-        assert_eq!(result.len(), 32); // SHA-256 output
-
-        // Same inputs should produce same output
-        let result2 = hi(b"password", b"salt", 1);
-        assert_eq!(result, result2);
-    }
-
-    #[test]
-    fn test_hi_iterations() {
-        // More iterations should produce different result
-        let r1 = hi(b"password", b"salt", 1);
-        let r4096 = hi(b"password", b"salt", 4096);
-        assert_ne!(r1, r4096);
-    }
-
-    #[test]
-    fn test_hmac_sha256() {
-        let result = hmac_sha256(b"key", b"data");
-        assert_eq!(result.len(), 32);
-    }
-
-    #[test]
-    fn test_saslprep_ascii() {
-        assert_eq!(saslprep("password").unwrap(), "password");
-    }
-
-    #[test]
-    fn test_saslprep_unicode() {
-        // SASLprep should normalize Unicode
-        let result = saslprep("p\u{00E4}ssword");
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_generate_nonce() {
-        let n1 = generate_nonce();
-        let n2 = generate_nonce();
-        assert_ne!(n1, n2);
-        assert!(!n1.is_empty());
-    }
 }
