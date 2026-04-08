@@ -310,3 +310,10 @@ fn test_option_to_sql_vec_none() {
     let vec = val.to_sql_vec().unwrap();
     assert!(vec.is_empty());
 }
+
+#[test]
+fn test_option_from_sql_oid() {
+    // Covers Option<T>::FromSql::oid() (lines 47-49)
+    assert_eq!(<Option<i32> as FromSql>::oid(), Oid::INT4);
+    assert_eq!(<Option<String> as FromSql>::oid(), Oid::TEXT);
+}
