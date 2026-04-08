@@ -1,6 +1,4 @@
-use sentinel_driver::auth::scram::{
-    generate_nonce, hi, hmac_sha256, parse_server_first, saslprep,
-};
+use sentinel_driver::auth::scram::{generate_nonce, hi, hmac_sha256, parse_server_first, saslprep};
 
 #[test]
 fn test_parse_server_first() {

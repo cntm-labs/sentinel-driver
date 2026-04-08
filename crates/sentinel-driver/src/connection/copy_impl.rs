@@ -1,4 +1,4 @@
-use super::{Connection, Result, copy};
+use super::{copy, Connection, Result};
 
 impl Connection {
     /// Start a COPY IN operation for bulk data loading.

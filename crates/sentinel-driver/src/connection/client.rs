@@ -1,6 +1,6 @@
 use super::{
-    BackendMessage, BytesMut, CancelToken, Config, Connection, Duration, Error, PgConnection,
-    PipelineBatch, Result, StatementCache, ToSql, TransactionStatus, pipeline, startup,
+    pipeline, startup, BackendMessage, BytesMut, CancelToken, Config, Connection, Duration, Error,
+    PgConnection, PipelineBatch, Result, StatementCache, ToSql, TransactionStatus,
 };
 
 impl Connection {

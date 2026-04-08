@@ -1,4 +1,4 @@
-use super::{Connection, PipelineBatch, Result, pipeline};
+use super::{pipeline, Connection, PipelineBatch, Result};
 
 impl Connection {
     /// Create a pipeline batch for executing multiple queries in a single round-trip.

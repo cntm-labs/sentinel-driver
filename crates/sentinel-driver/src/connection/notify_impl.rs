@@ -1,4 +1,4 @@
-use super::{Connection, Notification, Result, notify};
+use super::{notify, Connection, Notification, Result};
 
 impl Connection {
     /// Subscribe to LISTEN/NOTIFY on a channel.

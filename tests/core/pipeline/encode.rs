@@ -81,8 +81,8 @@ fn extract_message_types(buf: &[u8]) -> Vec<u8> {
         if pos + 5 > buf.len() {
             break;
         }
-        let len = i32::from_be_bytes([buf[pos + 1], buf[pos + 2], buf[pos + 3], buf[pos + 4]])
-            as usize;
+        let len =
+            i32::from_be_bytes([buf[pos + 1], buf[pos + 2], buf[pos + 3], buf[pos + 4]]) as usize;
         pos += 1 + len; // type byte + declared length (which includes its own 4 bytes)
     }
 

@@ -1,4 +1,4 @@
-use super::{Connection, Result, TransactionConfig, notify};
+use super::{notify, Connection, Result, TransactionConfig};
 
 impl Connection {
     /// Begin a transaction with default settings.

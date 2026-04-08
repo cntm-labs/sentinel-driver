@@ -1,4 +1,6 @@
-use sentinel_driver::notify::{quote_identifier, quote_literal, validate_channel_name, Notification};
+use sentinel_driver::notify::{
+    quote_identifier, quote_literal, validate_channel_name, Notification,
+};
 
 #[test]
 fn test_validate_channel_name() {

@@ -1,6 +1,6 @@
+use crate::error::Result;
 use crate::types::Oid;
 use bytes::BytesMut;
-use crate::error::Result;
 
 /// Encode a Rust value into PostgreSQL binary format.
 ///

@@ -1,6 +1,4 @@
-use super::{
-    BackendMessage, CacheMetrics, Connection, Error, Oid, Result, Statement, frontend,
-};
+use super::{frontend, BackendMessage, CacheMetrics, Connection, Error, Oid, Result, Statement};
 
 impl Connection {
     /// Prepare a statement on the server using extended query protocol.

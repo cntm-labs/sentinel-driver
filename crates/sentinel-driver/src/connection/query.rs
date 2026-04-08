@@ -1,6 +1,6 @@
 use super::{
-    BackendMessage, CommandResult, Connection, Duration, Error, Result, Row, ToSql, frontend,
-    pipeline, row,
+    frontend, pipeline, row, BackendMessage, CommandResult, Connection, Duration, Error, Result,
+    Row, ToSql,
 };
 
 impl Connection {
