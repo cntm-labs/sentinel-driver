@@ -347,3 +347,44 @@ async fn test_query_stream_large_result_set() {
 
     conn.close().await.unwrap();
 }
+
+#[tokio::test]
+async fn test_query_stream_close_encounters_error() {
+    let url = require_pg!();
+    let config = Config::parse(&url).unwrap();
+    let mut conn = sentinel_driver::Connection::connect(config).await.unwrap();
+
+    // Same volatile bomb: errors at row 1000
+    conn.simple_query(
+        "CREATE OR REPLACE FUNCTION _volatile_bomb(int) RETURNS int AS $$ \
+         BEGIN \
+           IF $1 = 1000 THEN RAISE EXCEPTION 'boom at 1000'; END IF; \
+           RETURN $1; \
+         END; \
+         $$ LANGUAGE plpgsql VOLATILE",
+    )
+    .await
+    .unwrap();
+
+    let mut stream = conn
+        .query_stream(
+            "SELECT _volatile_bomb(x::int) FROM generate_series(1, 2000) AS x",
+            &[],
+        )
+        .await
+        .unwrap();
+
+    // Read only a few rows, leave the rest (including the error) pending
+    let row = stream.next().await.unwrap().unwrap();
+    assert_eq!(row.get::<i32>(0), 1);
+
+    // close() drains remaining rows and hits ErrorResponse mid-drain
+    let result = stream.close().await;
+    assert!(result.is_err());
+
+    // Connection should still be usable after close error
+    let rows = conn.query("SELECT 1 AS ok", &[]).await.unwrap();
+    assert_eq!(rows[0].get::<i32>(0), 1);
+
+    conn.close().await.unwrap();
+}
