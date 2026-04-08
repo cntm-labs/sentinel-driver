@@ -54,6 +54,26 @@ pub struct Config {
     pub(crate) _keepalive_idle: Option<Duration>,
     pub(crate) _target_session_attrs: TargetSessionAttrs,
     pub(crate) _extra_float_digits: Option<i32>,
+    /// Path to client certificate file for certificate authentication.
+    pub(crate) ssl_client_cert: Option<std::path::PathBuf>,
+    /// Path to client private key file for certificate authentication.
+    pub(crate) ssl_client_key: Option<std::path::PathBuf>,
+    /// Use direct TLS connection (PG 17+) — skip SSLRequest negotiation.
+    pub(crate) ssl_direct: bool,
+    /// Enable SCRAM-SHA-256 channel binding (SCRAM-PLUS) when TLS is active.
+    pub(crate) channel_binding: ChannelBinding,
+}
+
+/// Channel binding preference for SCRAM authentication.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ChannelBinding {
+    /// Use channel binding if available (default).
+    #[default]
+    Prefer,
+    /// Require channel binding — fail if server doesn't support it.
+    Require,
+    /// Disable channel binding.
+    Disable,
 }
 
 /// Target session attributes for connection validation.
@@ -231,6 +251,26 @@ impl Config {
     pub fn statement_timeout(&self) -> Option<Duration> {
         self.statement_timeout
     }
+
+    /// Path to client certificate for certificate authentication.
+    pub fn ssl_client_cert(&self) -> Option<&std::path::Path> {
+        self.ssl_client_cert.as_deref()
+    }
+
+    /// Path to client private key for certificate authentication.
+    pub fn ssl_client_key(&self) -> Option<&std::path::Path> {
+        self.ssl_client_key.as_deref()
+    }
+
+    /// Whether direct TLS (PG 17+) is enabled.
+    pub fn ssl_direct(&self) -> bool {
+        self.ssl_direct
+    }
+
+    /// Channel binding preference for SCRAM authentication.
+    pub fn channel_binding(&self) -> ChannelBinding {
+        self.channel_binding
+    }
 }
 
 /// Builder for [`Config`].
@@ -341,6 +381,10 @@ impl ConfigBuilder {
             _keepalive_idle: self.keepalive_idle,
             _target_session_attrs: self.target_session_attrs,
             _extra_float_digits: self.extra_float_digits,
+            ssl_client_cert: None,
+            ssl_client_key: None,
+            ssl_direct: false,
+            channel_binding: ChannelBinding::default(),
         }
     }
 }

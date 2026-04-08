@@ -36,6 +36,21 @@ struct PoolShared {
     state: Mutex<PoolState>,
 }
 
+/// Snapshot of pool statistics.
+///
+/// Cheap to produce — reads from pool state under a single lock.
+#[derive(Debug, Clone, Copy)]
+pub struct PoolMetrics {
+    /// Number of connections currently checked out by users.
+    pub active: usize,
+    /// Number of idle connections available for checkout.
+    pub idle: usize,
+    /// Total connections (active + idle).
+    pub total: usize,
+    /// Maximum allowed connections.
+    pub max: usize,
+}
+
 /// A connection pool for PostgreSQL.
 ///
 /// Cheaply cloneable (internally Arc'd). Uses a semaphore to limit max
@@ -212,6 +227,19 @@ impl Pool {
     /// Maximum number of connections allowed.
     pub fn max_connections(&self) -> usize {
         self.shared.pool_config.max_connections
+    }
+
+    /// Get a snapshot of pool metrics.
+    pub async fn metrics(&self) -> PoolMetrics {
+        let state = self.shared.state.lock().await;
+        let idle = state.idle.len();
+        let total = state.total_count;
+        PoolMetrics {
+            active: total.saturating_sub(idle),
+            idle,
+            total,
+            max: self.shared.pool_config.max_connections,
+        }
     }
 
     // ── Internal ─────────────────────────────────────

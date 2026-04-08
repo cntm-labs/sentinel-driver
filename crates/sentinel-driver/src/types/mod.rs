@@ -3,6 +3,7 @@ pub mod builtin;
 pub mod decode;
 pub mod encode;
 pub mod geometric;
+pub mod hstore;
 pub mod interval;
 pub mod lsn;
 pub mod money;
