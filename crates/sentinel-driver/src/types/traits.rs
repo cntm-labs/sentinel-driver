@@ -19,6 +19,15 @@ pub trait ToSql {
         self.to_sql(&mut buf)?;
         Ok(buf.to_vec())
     }
+
+    /// Returns `true` if this value represents SQL NULL.
+    ///
+    /// Used by the parameter encoding layer to send the correct wire
+    /// protocol NULL marker (length = -1) instead of an empty byte array.
+    /// Default: `false`. Overridden by `Option<T>` to return `true` for `None`.
+    fn is_null(&self) -> bool {
+        false
+    }
 }
 
 /// Decode a Rust value from PostgreSQL binary format.
@@ -75,6 +84,10 @@ impl<T: ToSql> ToSql for Option<T> {
             Some(v) => v.to_sql(buf),
             None => Ok(()), // caller handles NULL encoding (-1 length)
         }
+    }
+
+    fn is_null(&self) -> bool {
+        self.is_none()
     }
 }
 

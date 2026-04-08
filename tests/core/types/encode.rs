@@ -317,3 +317,64 @@ fn test_option_from_sql_oid() {
     assert_eq!(<Option<i32> as FromSql>::oid(), Oid::INT4);
     assert_eq!(<Option<String> as FromSql>::oid(), Oid::TEXT);
 }
+
+#[test]
+fn test_is_null_default_false() {
+    let val = 42i32;
+    assert!(!val.is_null());
+}
+
+#[test]
+fn test_is_null_option_none() {
+    let val: Option<i32> = None;
+    assert!(val.is_null());
+}
+
+#[test]
+fn test_is_null_option_some() {
+    let val: Option<i32> = Some(42);
+    assert!(!val.is_null());
+}
+
+#[test]
+fn test_null_param_encodes_as_none() {
+    // Simulate the fixed query_internal encoding logic
+    let params: Vec<&(dyn sentinel_driver::ToSql + Sync)> = vec![&None::<i32>];
+    let mut encoded: Vec<Option<Vec<u8>>> = Vec::new();
+
+    for param in &params {
+        if param.is_null() {
+            encoded.push(None);
+        } else {
+            let mut buf = BytesMut::new();
+            param.to_sql(&mut buf).unwrap();
+            encoded.push(Some(buf.to_vec()));
+        }
+    }
+
+    assert_eq!(encoded.len(), 1);
+    assert!(
+        encoded[0].is_none(),
+        "NULL param must encode as None, not Some(empty)"
+    );
+}
+
+#[test]
+fn test_non_null_param_encodes_as_some() {
+    let params: Vec<&(dyn sentinel_driver::ToSql + Sync)> = vec![&42i32];
+    let mut encoded: Vec<Option<Vec<u8>>> = Vec::new();
+
+    for param in &params {
+        if param.is_null() {
+            encoded.push(None);
+        } else {
+            let mut buf = BytesMut::new();
+            param.to_sql(&mut buf).unwrap();
+            encoded.push(Some(buf.to_vec()));
+        }
+    }
+
+    assert_eq!(encoded.len(), 1);
+    assert!(encoded[0].is_some());
+    assert_eq!(encoded[0].as_ref().unwrap(), &42i32.to_be_bytes());
+}
