@@ -288,3 +288,25 @@ fn test_encode_param_nullable_none() {
     let result = encode_param_nullable(&val).unwrap();
     assert!(result.is_none());
 }
+
+#[test]
+fn test_from_sql_nullable_some_value() {
+    // Covers the default from_sql_nullable Some branch on the base FromSql trait
+    let data = 42i32.to_be_bytes();
+    let val: i32 = FromSql::from_sql_nullable(Some(&data[..])).unwrap();
+    assert_eq!(val, 42);
+}
+
+#[test]
+fn test_option_to_sql_vec_some() {
+    let val: Option<i32> = Some(99);
+    let vec = val.to_sql_vec().unwrap();
+    assert_eq!(vec, 99i32.to_be_bytes().to_vec());
+}
+
+#[test]
+fn test_option_to_sql_vec_none() {
+    let val: Option<i32> = None;
+    let vec = val.to_sql_vec().unwrap();
+    assert!(vec.is_empty());
+}
