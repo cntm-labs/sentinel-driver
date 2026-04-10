@@ -384,4 +384,29 @@ mod tests {
         // y,, should NOT include channel binding data
         assert_eq!(data, b"y,,");
     }
+
+    #[test]
+    fn test_select_mechanism_prefer_no_mechanisms() {
+        let err = select_mechanism(ChannelBinding::Prefer, false, false, false).unwrap_err();
+        assert!(err.to_string().contains("no supported SASL mechanisms"));
+    }
+
+    #[test]
+    fn test_select_mechanism_prefer_tls_no_mechanisms() {
+        let err = select_mechanism(ChannelBinding::Prefer, true, false, false).unwrap_err();
+        assert!(err.to_string().contains("no supported SASL mechanisms"));
+    }
+
+    #[test]
+    fn test_select_mechanism_disable_no_plain() {
+        let err = select_mechanism(ChannelBinding::Disable, true, true, false).unwrap_err();
+        assert!(err.to_string().contains("no supported SASL mechanisms"));
+    }
+
+    #[test]
+    fn test_select_mechanism_prefer_no_tls_plus_only() {
+        // Server only offers PLUS but client has no TLS — should fail
+        let err = select_mechanism(ChannelBinding::Prefer, false, true, false).unwrap_err();
+        assert!(err.to_string().contains("no supported SASL mechanisms"));
+    }
 }
