@@ -2,6 +2,7 @@ use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 use hmac::{Hmac, Mac};
 use sha2::{Digest, Sha256};
 
+use crate::config::ChannelBinding;
 use crate::connection::stream::PgConnection;
 use crate::error::{Error, Result};
 use crate::protocol::backend::BackendMessage;
@@ -9,7 +10,7 @@ use crate::protocol::frontend;
 
 type HmacSha256 = Hmac<Sha256>;
 
-/// Perform SCRAM-SHA-256 authentication with the server.
+/// Perform SCRAM-SHA-256 (or SCRAM-SHA-256-PLUS) authentication with the server.
 ///
 /// This handles the full 3-message exchange:
 /// 1. Client sends SASLInitialResponse with client-first-message
@@ -20,15 +21,15 @@ pub(crate) async fn authenticate(
     conn: &mut PgConnection,
     password: &str,
     mechanisms: &[String],
+    channel_binding: ChannelBinding,
+    server_cert_der: Option<&[u8]>,
 ) -> Result<()> {
-    // Check that SCRAM-SHA-256 is offered
-    let mechanism = if mechanisms.iter().any(|m| m == "SCRAM-SHA-256") {
-        "SCRAM-SHA-256"
-    } else {
-        return Err(Error::Auth(format!(
-            "server offered unsupported SASL mechanisms: {mechanisms:?}"
-        )));
-    };
+    // Determine mechanism and GS2 header based on channel binding config
+    let has_plus = mechanisms.iter().any(|m| m == "SCRAM-SHA-256-PLUS");
+    let has_plain = mechanisms.iter().any(|m| m == "SCRAM-SHA-256");
+    let is_tls = server_cert_der.is_some();
+
+    let (mechanism, gs2_header) = select_mechanism(channel_binding, is_tls, has_plus, has_plain)?;
 
     // SASLprep the password (RFC 7613)
     let prepped_password = saslprep(password)?;
@@ -39,7 +40,7 @@ pub(crate) async fn authenticate(
     // Client-first-message-bare: n=,r=<nonce>
     // We don't send a username in the SCRAM exchange; PG uses the startup user.
     let client_first_bare = format!("n=,r={client_nonce}");
-    let client_first_message = format!("n,,{client_first_bare}");
+    let client_first_message = format!("{gs2_header}{client_first_bare}");
 
     // Send SASLInitialResponse
     frontend::sasl_initial_response(conn.write_buf(), mechanism, client_first_message.as_bytes());
@@ -86,9 +87,12 @@ pub(crate) async fn authenticate(
     let stored_key = sha256(&client_key);
     let server_key = hmac_sha256(&salted_password, b"Server Key");
 
+    // Build channel binding data for c= parameter
+    let cbind_input = build_channel_binding_data(gs2_header, server_cert_der);
+    let channel_binding_b64 = BASE64.encode(&cbind_input);
+
     // client-final-message-without-proof
-    let channel_binding = BASE64.encode("n,,");
-    let client_final_without_proof = format!("c={channel_binding},r={}", parsed.nonce);
+    let client_final_without_proof = format!("c={channel_binding_b64},r={}", parsed.nonce);
 
     // AuthMessage = client-first-bare + "," + server-first + "," + client-final-without-proof
     let auth_message = format!("{client_first_bare},{server_first},{client_final_without_proof}");
@@ -155,6 +159,65 @@ pub(crate) async fn authenticate(
             "expected AuthenticationOk, got {other:?}"
         ))),
     }
+}
+
+/// Select SCRAM mechanism and GS2 header based on channel binding config.
+fn select_mechanism(
+    channel_binding: ChannelBinding,
+    is_tls: bool,
+    has_plus: bool,
+    has_plain: bool,
+) -> Result<(&'static str, &'static str)> {
+    match channel_binding {
+        ChannelBinding::Require => {
+            if !is_tls {
+                return Err(Error::Auth("channel binding requires TLS".into()));
+            }
+            if !has_plus {
+                return Err(Error::Auth(
+                    "server does not support SCRAM-SHA-256-PLUS".into(),
+                ));
+            }
+            Ok(("SCRAM-SHA-256-PLUS", "p=tls-server-end-point,,"))
+        }
+        ChannelBinding::Prefer => {
+            if is_tls && has_plus {
+                Ok(("SCRAM-SHA-256-PLUS", "p=tls-server-end-point,,"))
+            } else if has_plain {
+                // y,, = client supports channel binding but server doesn't advertise it
+                let gs2 = if is_tls { "y,," } else { "n,," };
+                Ok(("SCRAM-SHA-256", gs2))
+            } else {
+                Err(Error::Auth(
+                    "server offered no supported SASL mechanisms".into(),
+                ))
+            }
+        }
+        ChannelBinding::Disable => {
+            if has_plain {
+                Ok(("SCRAM-SHA-256", "n,,"))
+            } else {
+                Err(Error::Auth(
+                    "server offered no supported SASL mechanisms".into(),
+                ))
+            }
+        }
+    }
+}
+
+/// Build the channel binding input bytes: gs2_header + cbind_data.
+///
+/// For `tls-server-end-point`, cbind_data is SHA-256 hash of the server's DER certificate.
+/// For non-PLUS, cbind_data is empty (just the GS2 header).
+fn build_channel_binding_data(gs2_header: &str, server_cert_der: Option<&[u8]>) -> Vec<u8> {
+    let mut data = gs2_header.as_bytes().to_vec();
+    if gs2_header.starts_with("p=tls-server-end-point") {
+        if let Some(cert_der) = server_cert_der {
+            let hash = sha256(cert_der);
+            data.extend_from_slice(&hash);
+        }
+    }
+    data
 }
 
 pub struct ServerFirst {
@@ -238,4 +301,112 @@ pub fn generate_nonce() -> String {
     let mut rng = rand::thread_rng();
     let bytes: Vec<u8> = (0..24).map(|_| rng.gen()).collect();
     BASE64.encode(&bytes)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_select_mechanism_require_with_tls_and_plus() {
+        let (mech, gs2) = select_mechanism(ChannelBinding::Require, true, true, true).unwrap();
+        assert_eq!(mech, "SCRAM-SHA-256-PLUS");
+        assert_eq!(gs2, "p=tls-server-end-point,,");
+    }
+
+    #[test]
+    fn test_select_mechanism_require_without_tls() {
+        let err = select_mechanism(ChannelBinding::Require, false, false, true).unwrap_err();
+        assert!(err.to_string().contains("channel binding requires TLS"));
+    }
+
+    #[test]
+    fn test_select_mechanism_require_no_plus() {
+        let err = select_mechanism(ChannelBinding::Require, true, false, true).unwrap_err();
+        assert!(err
+            .to_string()
+            .contains("does not support SCRAM-SHA-256-PLUS"));
+    }
+
+    #[test]
+    fn test_select_mechanism_prefer_with_tls_and_plus() {
+        let (mech, gs2) = select_mechanism(ChannelBinding::Prefer, true, true, true).unwrap();
+        assert_eq!(mech, "SCRAM-SHA-256-PLUS");
+        assert_eq!(gs2, "p=tls-server-end-point,,");
+    }
+
+    #[test]
+    fn test_select_mechanism_prefer_tls_no_plus() {
+        let (mech, gs2) = select_mechanism(ChannelBinding::Prefer, true, false, true).unwrap();
+        assert_eq!(mech, "SCRAM-SHA-256");
+        assert_eq!(gs2, "y,,");
+    }
+
+    #[test]
+    fn test_select_mechanism_prefer_no_tls() {
+        let (mech, gs2) = select_mechanism(ChannelBinding::Prefer, false, false, true).unwrap();
+        assert_eq!(mech, "SCRAM-SHA-256");
+        assert_eq!(gs2, "n,,");
+    }
+
+    #[test]
+    fn test_select_mechanism_disable() {
+        let (mech, gs2) = select_mechanism(ChannelBinding::Disable, true, true, true).unwrap();
+        assert_eq!(mech, "SCRAM-SHA-256");
+        assert_eq!(gs2, "n,,");
+    }
+
+    #[test]
+    fn test_build_channel_binding_no_plus() {
+        let data = build_channel_binding_data("n,,", None);
+        assert_eq!(data, b"n,,");
+        assert_eq!(BASE64.encode(&data), "biws");
+    }
+
+    #[test]
+    fn test_build_channel_binding_with_plus() {
+        let fake_cert = b"fake-server-certificate-der";
+        let data = build_channel_binding_data("p=tls-server-end-point,,", Some(fake_cert));
+        // Should be: gs2_header bytes + sha256(cert)
+        let expected_hash = sha256(fake_cert);
+        let mut expected = b"p=tls-server-end-point,,".to_vec();
+        expected.extend_from_slice(&expected_hash);
+        assert_eq!(data, expected);
+    }
+
+    #[test]
+    fn test_gs2_header_y_flag() {
+        // y,, means client supports CB but server didn't advertise PLUS
+        let (mech, gs2) = select_mechanism(ChannelBinding::Prefer, true, false, true).unwrap();
+        assert_eq!(mech, "SCRAM-SHA-256");
+        assert_eq!(gs2, "y,,");
+        let data = build_channel_binding_data(gs2, Some(b"cert"));
+        // y,, should NOT include channel binding data
+        assert_eq!(data, b"y,,");
+    }
+
+    #[test]
+    fn test_select_mechanism_prefer_no_mechanisms() {
+        let err = select_mechanism(ChannelBinding::Prefer, false, false, false).unwrap_err();
+        assert!(err.to_string().contains("no supported SASL mechanisms"));
+    }
+
+    #[test]
+    fn test_select_mechanism_prefer_tls_no_mechanisms() {
+        let err = select_mechanism(ChannelBinding::Prefer, true, false, false).unwrap_err();
+        assert!(err.to_string().contains("no supported SASL mechanisms"));
+    }
+
+    #[test]
+    fn test_select_mechanism_disable_no_plain() {
+        let err = select_mechanism(ChannelBinding::Disable, true, true, false).unwrap_err();
+        assert!(err.to_string().contains("no supported SASL mechanisms"));
+    }
+
+    #[test]
+    fn test_select_mechanism_prefer_no_tls_plus_only() {
+        // Server only offers PLUS but client has no TLS — should fail
+        let err = select_mechanism(ChannelBinding::Prefer, false, true, false).unwrap_err();
+        assert!(err.to_string().contains("no supported SASL mechanisms"));
+    }
 }

@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::time::Duration;
 
 use crate::error::{Error, Result};
@@ -199,6 +200,32 @@ impl Config {
                             }
                         });
                     }
+                    "sslcert" => {
+                        config = config.ssl_client_cert(PathBuf::from(value));
+                    }
+                    "sslkey" => {
+                        config = config.ssl_client_key(PathBuf::from(value));
+                    }
+                    "ssldirect" | "sslnegotiation" => {
+                        let direct = match value.as_str() {
+                            "true" | "direct" => true,
+                            "false" | "postgres" => false,
+                            _ => return Err(Error::Config(format!("invalid {key}: {value}"))),
+                        };
+                        config = config.ssl_direct(direct);
+                    }
+                    "channel_binding" => {
+                        config = config.channel_binding(match value.as_str() {
+                            "prefer" => ChannelBinding::Prefer,
+                            "require" => ChannelBinding::Require,
+                            "disable" => ChannelBinding::Disable,
+                            _ => {
+                                return Err(Error::Config(format!(
+                                    "invalid channel_binding: {value}"
+                                )))
+                            }
+                        });
+                    }
                     _ => {
                         // Ignore unknown parameters for forward compatibility
                     }
@@ -289,6 +316,10 @@ pub struct ConfigBuilder {
     keepalive_idle: Option<Duration>,
     target_session_attrs: TargetSessionAttrs,
     extra_float_digits: Option<i32>,
+    ssl_client_cert: Option<PathBuf>,
+    ssl_client_key: Option<PathBuf>,
+    ssl_direct: bool,
+    channel_binding: ChannelBinding,
 }
 
 impl ConfigBuilder {
@@ -307,6 +338,10 @@ impl ConfigBuilder {
             keepalive_idle: None,
             target_session_attrs: TargetSessionAttrs::default(),
             extra_float_digits: Some(3),
+            ssl_client_cert: None,
+            ssl_client_key: None,
+            ssl_direct: false,
+            channel_binding: ChannelBinding::default(),
         }
     }
 
@@ -365,6 +400,30 @@ impl ConfigBuilder {
         self
     }
 
+    /// Set the path to the client certificate file for certificate authentication.
+    pub fn ssl_client_cert(mut self, path: impl Into<PathBuf>) -> Self {
+        self.ssl_client_cert = Some(path.into());
+        self
+    }
+
+    /// Set the path to the client private key file for certificate authentication.
+    pub fn ssl_client_key(mut self, path: impl Into<PathBuf>) -> Self {
+        self.ssl_client_key = Some(path.into());
+        self
+    }
+
+    /// Enable direct TLS connection (PG 17+), skipping SSLRequest negotiation.
+    pub fn ssl_direct(mut self, direct: bool) -> Self {
+        self.ssl_direct = direct;
+        self
+    }
+
+    /// Set the channel binding preference for SCRAM authentication.
+    pub fn channel_binding(mut self, binding: ChannelBinding) -> Self {
+        self.channel_binding = binding;
+        self
+    }
+
     /// Build the final `Config`.
     pub fn build(self) -> Config {
         Config {
@@ -381,10 +440,10 @@ impl ConfigBuilder {
             _keepalive_idle: self.keepalive_idle,
             _target_session_attrs: self.target_session_attrs,
             _extra_float_digits: self.extra_float_digits,
-            ssl_client_cert: None,
-            ssl_client_key: None,
-            ssl_direct: false,
-            channel_binding: ChannelBinding::default(),
+            ssl_client_cert: self.ssl_client_cert,
+            ssl_client_key: self.ssl_client_key,
+            ssl_direct: self.ssl_direct,
+            channel_binding: self.channel_binding,
         }
     }
 }

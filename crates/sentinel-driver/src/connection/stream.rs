@@ -78,43 +78,48 @@ impl PgConnection {
 
         tcp.set_nodelay(true).ok();
 
-        let tls_config = tls::make_tls_connector(config.ssl_mode(), config.host())?;
+        let tls_config = tls::make_tls_connector(config)?;
 
         let stream = match tls_config {
             Some(tls_cfg) => {
-                let mut tcp = tcp;
-                // Send SSLRequest
-                let mut ssl_buf = BytesMut::new();
-                frontend::ssl_request(&mut ssl_buf);
-                tcp.write_all(&ssl_buf).await.map_err(Error::Io)?;
+                if config.ssl_direct() {
+                    // Direct TLS (PG 17+): handshake immediately, skip SSLRequest
+                    let tls_stream = tls_cfg
+                        .connector
+                        .connect(tls_cfg.server_name, tcp)
+                        .await
+                        .map_err(|e| Error::Tls(format!("TLS handshake failed: {e}")))?;
+                    PgStream::Tls(Box::new(tls_stream))
+                } else {
+                    // Standard SSLRequest negotiation
+                    let mut tcp = tcp;
+                    let mut ssl_buf = BytesMut::new();
+                    frontend::ssl_request(&mut ssl_buf);
+                    tcp.write_all(&ssl_buf).await.map_err(Error::Io)?;
 
-                // Read single-byte response
-                let mut response = [0u8; 1];
-                tcp.read_exact(&mut response).await.map_err(Error::Io)?;
+                    let mut response = [0u8; 1];
+                    tcp.read_exact(&mut response).await.map_err(Error::Io)?;
 
-                match response[0] {
-                    b'S' => {
-                        // Server supports TLS — upgrade
-                        let tls_stream = tls_cfg
-                            .connector
-                            .connect(tls_cfg.server_name, tcp)
-                            .await
-                            .map_err(|e| Error::Tls(format!("TLS handshake failed: {e}")))?;
-                        PgStream::Tls(Box::new(tls_stream))
-                    }
-                    b'N' => {
-                        // Server doesn't support TLS
-                        match config.ssl_mode() {
+                    match response[0] {
+                        b'S' => {
+                            let tls_stream = tls_cfg
+                                .connector
+                                .connect(tls_cfg.server_name, tcp)
+                                .await
+                                .map_err(|e| Error::Tls(format!("TLS handshake failed: {e}")))?;
+                            PgStream::Tls(Box::new(tls_stream))
+                        }
+                        b'N' => match config.ssl_mode() {
                             SslMode::Prefer => PgStream::Tcp(tcp),
                             _ => {
                                 return Err(Error::Tls("server does not support TLS".to_string()));
                             }
+                        },
+                        b => {
+                            return Err(Error::protocol(format!(
+                                "unexpected SSL response: 0x{b:02x}"
+                            )));
                         }
-                    }
-                    b => {
-                        return Err(Error::protocol(format!(
-                            "unexpected SSL response: 0x{b:02x}"
-                        )));
                     }
                 }
             }
@@ -189,5 +194,20 @@ impl PgConnection {
     /// Returns `true` if the connection is using TLS.
     pub fn is_tls(&self) -> bool {
         matches!(self.stream, PgStream::Tls(_))
+    }
+
+    /// Extract the DER-encoded server certificate from the TLS session.
+    ///
+    /// Returns `None` if not using TLS or no peer certificates available.
+    pub fn server_certificate_der(&self) -> Option<Vec<u8>> {
+        match &self.stream {
+            PgStream::Tls(tls_stream) => {
+                let (_, conn) = tls_stream.get_ref();
+                conn.peer_certificates()
+                    .and_then(|certs| certs.first())
+                    .map(|cert| cert.as_ref().to_vec())
+            }
+            PgStream::Tcp(_) => None,
+        }
     }
 }
