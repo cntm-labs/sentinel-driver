@@ -79,7 +79,15 @@ pub(crate) async fn startup(conn: &mut PgConnection, config: &Config) -> Result<
                     Error::Auth("server requested password but none provided".into())
                 })?;
 
-                auth::scram::authenticate(conn, password, &mechanisms).await?;
+                let server_cert = conn.server_certificate_der();
+                auth::scram::authenticate(
+                    conn,
+                    password,
+                    &mechanisms,
+                    config.channel_binding(),
+                    server_cert.as_deref(),
+                )
+                .await?;
             }
 
             BackendMessage::AuthenticationSaslContinue { .. }
