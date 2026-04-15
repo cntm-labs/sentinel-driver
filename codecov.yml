@@ -12,6 +12,7 @@ ignore:
   - "crates/sentinel-derive/"
   - "tests/"
   - "crates/sentinel-driver/src/connection/"
+  - "crates/sentinel-driver/src/generic_client.rs"
   - "crates/sentinel-driver/src/tls/"
   - "crates/sentinel-driver/src/lib.rs"
   - "crates/sentinel-driver/src/cancel.rs"
