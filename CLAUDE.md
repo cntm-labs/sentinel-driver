@@ -8,9 +8,10 @@ Can be used independently as a standalone PG driver crate.
 - **Language:** Rust (stable)
 - **Database:** PostgreSQL (only)
 - **Async:** tokio
-- **TLS:** rustls
-- **Crypto:** sha2, hmac, stringprep (for SCRAM-SHA-256)
+- **TLS:** rustls + rustls-pemfile (client certs)
+- **Crypto:** sha2, hmac, stringprep (for SCRAM-SHA-256 + SCRAM-SHA-256-PLUS)
 - **Buffers:** bytes (zero-copy)
+- **Async types:** futures-core (BoxFuture for pool callbacks)
 
 ## Project Structure
 ```
@@ -29,20 +30,40 @@ sentinel-driver/
 │   │       │   ├── stream.rs   # TCP/TLS stream
 │   │       │   └── startup.rs  # Handshake + auth
 │   │       ├── auth/
-│   │       │   ├── scram.rs    # SCRAM-SHA-256 (correct SASLprep)
+│   │       │   ├── scram.rs    # SCRAM-SHA-256 + SCRAM-SHA-256-PLUS (channel binding)
 │   │       │   └── md5.rs      # MD5 (legacy)
-│   │       ├── pool/           # Connection pool (<0.5 μs checkout)
+│   │       ├── pool/           # Connection pool (<0.5 μs checkout, callbacks, lazy connect)
 │   │       ├── pipeline/       # PG pipeline mode (auto-batch)
 │   │       ├── copy/           # COPY IN/OUT (binary + text)
 │   │       ├── notify/         # LISTEN/NOTIFY engine
-│   │       ├── types/          # PG type encode/decode (binary format)
-│   │       ├── tls/            # rustls integration
+│   │       ├── types/          # PG type encode/decode (16 modules, 66 OIDs)
+│   │       │   ├── oid.rs      # OID constants
+│   │       │   ├── traits.rs   # ToSql/FromSql traits
+│   │       │   ├── encode.rs   # ToSql implementations + array macros
+│   │       │   ├── decode.rs   # FromSql implementations + array macros
+│   │       │   ├── builtin.rs  # Type info registry
+│   │       │   ├── network.rs  # INET/CIDR/MACADDR
+│   │       │   ├── numeric.rs  # NUMERIC/Decimal (feature-gated)
+│   │       │   ├── range.rs    # Range types (6 variants)
+│   │       │   ├── interval.rs # PgInterval
+│   │       │   ├── geometric.rs # Point/Line/LSeg/Box/Path/Polygon/Circle
+│   │       │   ├── money.rs    # PgMoney
+│   │       │   ├── bit.rs      # BIT/VARBIT (PgBit)
+│   │       │   ├── hstore.rs   # HSTORE
+│   │       │   ├── xml.rs      # XML
+│   │       │   └── lsn.rs      # PG_LSN
+│   │       ├── tls/            # rustls + client certs + direct TLS (PG 17+)
 │   │       ├── row.rs          # Row type (zero-copy column access)
+│   │       ├── stream.rs       # RowStream (async row-by-row iteration)
+│   │       ├── portal.rs       # Portal/Cursor (server-side pagination)
+│   │       ├── advisory_lock.rs # Advisory locks (RAII)
+│   │       ├── observability.rs # Tracing spans, slow query, metrics
 │   │       ├── statement.rs    # Prepared statement
+│   │       ├── cancel.rs       # Query cancellation via CancelToken
 │   │       └── transaction.rs  # Transaction wrapper
 │   └── sentinel-derive/        # Derive macros crate
 │       └── src/
-│           └── lib.rs          # FromRow, ToSql, FromSql
+│           └── lib.rs          # FromRow, ToSql, FromSql (enums, composites, newtypes)
 ├── tests/
 │   ├── core/               # Unit-level integration tests (no PG required)
 │   ├── postgres/           # Live PG integration tests (DATABASE_URL required)
@@ -95,12 +116,19 @@ git config core.hooksPath .githooks   # Enable pre-commit hook
 | Stmt cache hit rate | ~99% |
 
 ## Key Features
-- SCRAM-SHA-256 with correct SASLprep (sqlx gets this wrong)
+- SCRAM-SHA-256 + SCRAM-SHA-256-PLUS with correct SASLprep and channel binding
+- Client certificate authentication + Direct TLS (PG 17+)
 - Pipeline mode (PG 14+) — batch queries in single round-trip
+- Row streaming — async row-by-row iteration for large result sets
+- Portal/Cursor — server-side pagination within transactions
 - COPY protocol — bulk insert 10-50x faster than INSERT
 - LISTEN/NOTIFY — first-class realtime notifications
-- Two-tier prepared statement cache (HashMap + LRU-256)
-- Connection pool (deadpool-style, <0.5 μs checkout)
+- Two-tier prepared statement cache (HashMap + LRU-256) with metrics
+- Connection pool (<0.5 μs checkout) with lifecycle callbacks + lazy connect
+- Advisory locks (RAII) — session and transaction scoped
+- Observability — tracing spans, slow query logging, query metrics callback
+- 66 OIDs — full PG type coverage including enums, composites, ranges, geometric, HSTORE
+- Criterion benchmarks for performance validation
 
 ## Conventions
 - No unsafe code — zero-copy via `bytes::Bytes` safe API (unsafe_code = "forbid")
@@ -117,9 +145,11 @@ Workspace lints defined in `Cargo.toml` `[workspace.lints.clippy]`:
 Use `expect("reason")` with `#[allow(clippy::expect_used)]` for infallible operations (constant dates, known-valid inputs).
 
 ## Dependencies (minimal)
-- tokio, bytes, rustls, webpki-roots
-- sha2, hmac, stringprep
-- chrono, uuid, thiserror
+- tokio, bytes, rustls, tokio-rustls, webpki-roots, rustls-pemfile
+- sha2, hmac, stringprep, base64, rand
+- chrono, uuid, thiserror, futures-core
+- tracing, lru, criterion (dev)
+- rust_decimal (optional, feature-gated)
 
 No sqlx, no openssl, no libpq.
 
