@@ -216,6 +216,65 @@ fn test_roundtrip_vec_uuid() {
 }
 
 #[test]
+fn test_roundtrip_vec_naive_datetime() {
+    let dt1 = chrono::NaiveDate::from_ymd_opt(2000, 1, 1)
+        .unwrap()
+        .and_hms_opt(0, 0, 0)
+        .unwrap();
+    let dt2 = chrono::NaiveDate::from_ymd_opt(2026, 4, 15)
+        .unwrap()
+        .and_hms_micro_opt(12, 30, 45, 123456)
+        .unwrap();
+    roundtrip(&vec![dt1, dt2]);
+    roundtrip(&Vec::<chrono::NaiveDateTime>::new());
+}
+
+#[test]
+fn test_roundtrip_vec_datetime_utc() {
+    let dt1 = chrono::DateTime::<chrono::Utc>::from_timestamp(0, 0).unwrap();
+    let dt2 = chrono::DateTime::<chrono::Utc>::from_timestamp(1712150400, 500_000_000).unwrap();
+    roundtrip(&vec![dt1, dt2]);
+}
+
+#[test]
+fn test_roundtrip_vec_naive_date() {
+    let d1 = chrono::NaiveDate::from_ymd_opt(2000, 1, 1).unwrap();
+    let d2 = chrono::NaiveDate::from_ymd_opt(2026, 4, 15).unwrap();
+    roundtrip(&vec![d1, d2]);
+}
+
+#[test]
+fn test_roundtrip_vec_naive_time() {
+    let t1 = chrono::NaiveTime::from_hms_opt(0, 0, 0).unwrap();
+    let t2 = chrono::NaiveTime::from_hms_micro_opt(23, 59, 59, 999999).unwrap();
+    roundtrip(&vec![t1, t2]);
+}
+
+#[test]
+fn test_roundtrip_vec_bytea() {
+    let v: Vec<Vec<u8>> = vec![vec![0xDE, 0xAD], vec![0xBE, 0xEF]];
+    roundtrip(&v);
+    roundtrip(&Vec::<Vec<u8>>::new());
+}
+
+#[test]
+fn test_roundtrip_vec_point() {
+    use sentinel_driver::types::geometric::PgPoint;
+    let v = vec![PgPoint { x: 1.0, y: 2.0 }, PgPoint { x: -3.5, y: 4.5 }];
+    roundtrip(&v);
+}
+
+#[test]
+fn test_roundtrip_vec_circle() {
+    use sentinel_driver::types::geometric::{PgCircle, PgPoint};
+    let v = vec![PgCircle {
+        center: PgPoint { x: 0.0, y: 0.0 },
+        radius: 5.0,
+    }];
+    roundtrip(&v);
+}
+
+#[test]
 fn test_decode_array_multidim_rejected() {
     let mut buf = BytesMut::new();
     buf.put_i32(2); // ndim = 2 (not supported)
@@ -331,6 +390,25 @@ fn test_array_from_sql_oid() {
     assert_eq!(<Vec<f64> as FromSql>::oid(), Oid::FLOAT8_ARRAY);
     assert_eq!(<Vec<String> as FromSql>::oid(), Oid::TEXT_ARRAY);
     assert_eq!(<Vec<uuid::Uuid> as FromSql>::oid(), Oid::UUID_ARRAY);
+    assert_eq!(
+        <Vec<chrono::NaiveDateTime> as FromSql>::oid(),
+        Oid::TIMESTAMP_ARRAY
+    );
+    assert_eq!(
+        <Vec<chrono::DateTime<chrono::Utc>> as FromSql>::oid(),
+        Oid::TIMESTAMPTZ_ARRAY
+    );
+    assert_eq!(<Vec<chrono::NaiveDate> as FromSql>::oid(), Oid::DATE_ARRAY);
+    assert_eq!(<Vec<chrono::NaiveTime> as FromSql>::oid(), Oid::TIME_ARRAY);
+    assert_eq!(<Vec<Vec<u8>> as FromSql>::oid(), Oid::BYTEA_ARRAY);
+    assert_eq!(
+        <Vec<sentinel_driver::types::geometric::PgPoint> as FromSql>::oid(),
+        Oid::POINT_ARRAY
+    );
+    assert_eq!(
+        <Vec<sentinel_driver::types::geometric::PgCircle> as FromSql>::oid(),
+        Oid::CIRCLE_ARRAY
+    );
 }
 
 #[test]

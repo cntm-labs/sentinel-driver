@@ -290,6 +290,45 @@ impl_array_to_sql!(
 #[cfg(feature = "with-rust-decimal")]
 impl_array_to_sql!(rust_decimal::Decimal, Oid::NUMERIC_ARRAY, Oid::NUMERIC);
 impl_array_to_sql!(crate::types::bit::PgBit, Oid::VARBIT_ARRAY, Oid::VARBIT);
+impl_array_to_sql!(chrono::NaiveDateTime, Oid::TIMESTAMP_ARRAY, Oid::TIMESTAMP);
+impl_array_to_sql!(
+    chrono::DateTime<chrono::Utc>,
+    Oid::TIMESTAMPTZ_ARRAY,
+    Oid::TIMESTAMPTZ
+);
+impl_array_to_sql!(chrono::NaiveDate, Oid::DATE_ARRAY, Oid::DATE);
+impl_array_to_sql!(chrono::NaiveTime, Oid::TIME_ARRAY, Oid::TIME);
+impl_array_to_sql!(
+    crate::types::geometric::PgPoint,
+    Oid::POINT_ARRAY,
+    Oid::POINT
+);
+impl_array_to_sql!(
+    crate::types::geometric::PgCircle,
+    Oid::CIRCLE_ARRAY,
+    Oid::CIRCLE
+);
+
+impl_array_to_sql!(
+    crate::types::timetz::PgTimeTz,
+    Oid::TIMETZ_ARRAY,
+    Oid::TIMETZ
+);
+impl_array_to_sql!(
+    crate::types::network::PgMacAddr8,
+    Oid::MACADDR8_ARRAY,
+    Oid::MACADDR8
+);
+
+impl ToSql for Vec<Vec<u8>> {
+    fn oid(&self) -> Oid {
+        Oid::BYTEA_ARRAY
+    }
+
+    fn to_sql(&self, buf: &mut BytesMut) -> Result<()> {
+        encode_array(self, Oid::BYTEA, buf)
+    }
+}
 
 impl ToSql for Vec<&str> {
     fn oid(&self) -> Oid {

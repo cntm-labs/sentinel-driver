@@ -63,3 +63,34 @@ impl<T: serde::de::DeserializeOwned> FromSql for Json<T> {
         Ok(Json(value))
     }
 }
+
+// ── serde_json::Value direct support ────────────────
+
+impl ToSql for serde_json::Value {
+    fn oid(&self) -> Oid {
+        Oid::JSONB
+    }
+
+    fn to_sql(&self, buf: &mut BytesMut) -> Result<()> {
+        buf.put_u8(JSONB_VERSION);
+        serde_json::to_writer(buf.writer(), self)
+            .map_err(|e| Error::Encode(format!("jsonb: serialization failed: {e}")))?;
+        Ok(())
+    }
+}
+
+impl FromSql for serde_json::Value {
+    fn oid() -> Oid {
+        Oid::JSONB
+    }
+
+    fn from_sql(buf: &[u8]) -> Result<Self> {
+        let data = if buf.first() == Some(&JSONB_VERSION) {
+            &buf[1..]
+        } else {
+            buf
+        };
+        serde_json::from_slice(data)
+            .map_err(|e| Error::Decode(format!("jsonb: deserialization failed: {e}")))
+    }
+}

@@ -85,3 +85,52 @@ fn test_json_null_value() {
     let decoded: Json<serde_json::Value> = Json::from_sql(&buf).unwrap();
     assert!(decoded.0.is_null());
 }
+
+// ── serde_json::Value direct support (no Json<T> wrapper) ──
+
+#[test]
+fn test_value_direct_oid() {
+    let val = serde_json::json!({"key": "value"});
+    assert_eq!(val.oid(), Oid::JSONB);
+    assert_eq!(<serde_json::Value as FromSql>::oid(), Oid::JSONB);
+}
+
+#[test]
+fn test_value_direct_roundtrip_object() {
+    let val = serde_json::json!({"name": "Alice", "age": 30});
+    let mut buf = BytesMut::new();
+    val.to_sql(&mut buf).unwrap();
+
+    assert_eq!(buf[0], 1); // JSONB version byte
+
+    let decoded: serde_json::Value = FromSql::from_sql(&buf).unwrap();
+    assert_eq!(decoded["name"], "Alice");
+    assert_eq!(decoded["age"], 30);
+}
+
+#[test]
+fn test_value_direct_roundtrip_array() {
+    let val = serde_json::json!([1, "two", null, true]);
+    let mut buf = BytesMut::new();
+    val.to_sql(&mut buf).unwrap();
+
+    let decoded: serde_json::Value = FromSql::from_sql(&buf).unwrap();
+    assert_eq!(decoded, val);
+}
+
+#[test]
+fn test_value_direct_roundtrip_null() {
+    let val = serde_json::Value::Null;
+    let mut buf = BytesMut::new();
+    val.to_sql(&mut buf).unwrap();
+
+    let decoded: serde_json::Value = FromSql::from_sql(&buf).unwrap();
+    assert!(decoded.is_null());
+}
+
+#[test]
+fn test_value_direct_decode_without_version_byte() {
+    let raw = br#"{"key":"value"}"#;
+    let decoded: serde_json::Value = FromSql::from_sql(raw).unwrap();
+    assert_eq!(decoded["key"], "value");
+}

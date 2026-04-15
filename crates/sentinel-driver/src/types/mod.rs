@@ -9,11 +9,13 @@ pub mod interval;
 pub mod json;
 pub mod lsn;
 pub mod money;
+pub mod multirange;
 pub mod network;
 #[cfg(feature = "with-rust-decimal")]
 pub mod numeric;
 pub mod oid;
 pub mod range;
+pub mod timetz;
 pub mod traits;
 pub mod xml;
 
