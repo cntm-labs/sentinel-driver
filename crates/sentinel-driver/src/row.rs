@@ -188,7 +188,7 @@ pub struct SimpleQueryRow {
 }
 
 impl SimpleQueryRow {
-    pub(crate) fn new(columns: Vec<Option<String>>) -> Self {
+    pub fn new(columns: Vec<Option<String>>) -> Self {
         Self { columns }
     }
 

@@ -119,6 +119,48 @@ fn test_roundtrip_naive_time() {
 }
 
 #[test]
+fn test_roundtrip_timestamp_infinity() {
+    roundtrip(&chrono::NaiveDateTime::MAX);
+    roundtrip(&chrono::NaiveDateTime::MIN);
+}
+
+#[test]
+fn test_roundtrip_timestamptz_infinity() {
+    roundtrip(&chrono::NaiveDateTime::MAX.and_utc());
+    roundtrip(&chrono::NaiveDateTime::MIN.and_utc());
+}
+
+#[test]
+fn test_roundtrip_date_infinity() {
+    roundtrip(&chrono::NaiveDate::MAX);
+    roundtrip(&chrono::NaiveDate::MIN);
+}
+
+#[test]
+fn test_decode_timestamp_positive_infinity() {
+    let decoded = chrono::NaiveDateTime::from_sql(&i64::MAX.to_be_bytes()).unwrap();
+    assert_eq!(decoded, chrono::NaiveDateTime::MAX);
+}
+
+#[test]
+fn test_decode_timestamp_negative_infinity() {
+    let decoded = chrono::NaiveDateTime::from_sql(&i64::MIN.to_be_bytes()).unwrap();
+    assert_eq!(decoded, chrono::NaiveDateTime::MIN);
+}
+
+#[test]
+fn test_decode_date_positive_infinity() {
+    let decoded = chrono::NaiveDate::from_sql(&i32::MAX.to_be_bytes()).unwrap();
+    assert_eq!(decoded, chrono::NaiveDate::MAX);
+}
+
+#[test]
+fn test_decode_date_negative_infinity() {
+    let decoded = chrono::NaiveDate::from_sql(&i32::MIN.to_be_bytes()).unwrap();
+    assert_eq!(decoded, chrono::NaiveDate::MIN);
+}
+
+#[test]
 fn test_decode_wrong_size() {
     assert!(i32::from_sql(&[0, 0]).is_err());
     assert!(bool::from_sql(&[]).is_err());
