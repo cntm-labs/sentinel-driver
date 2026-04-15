@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
 use sentinel_driver::protocol::backend::{self, BackendMessage, DataRowColumns, FieldDescription};
-use sentinel_driver::row::{parse_command_tag, Row, RowDescription};
+use sentinel_driver::row::{
+    parse_command_tag, Row, RowDescription, SimpleQueryMessage, SimpleQueryRow,
+};
 
 fn make_test_description() -> Arc<RowDescription> {
     Arc::new(RowDescription::new(vec![
@@ -175,4 +177,56 @@ fn test_row_description() {
     assert_eq!(desc.column_index("name"), Some(1));
     assert_eq!(desc.column_index("nonexistent"), None);
     assert_eq!(desc.field(0).unwrap().name, "id");
+}
+
+// ── SimpleQueryRow tests ──────────────────────────
+
+#[test]
+fn test_simple_query_row_get() {
+    let row = SimpleQueryRow::new(vec![
+        Some("42".to_string()),
+        Some("hello".to_string()),
+        None,
+    ]);
+
+    assert_eq!(row.get(0), Some("42"));
+    assert_eq!(row.get(1), Some("hello"));
+    assert_eq!(row.get(2), None);
+    assert_eq!(row.get(99), None);
+}
+
+#[test]
+fn test_simple_query_row_try_get() {
+    let row = SimpleQueryRow::new(vec![Some("value".to_string()), None]);
+
+    assert_eq!(row.try_get(0).unwrap(), "value");
+    assert!(row.try_get(1).is_err()); // NULL
+    assert!(row.try_get(5).is_err()); // out of bounds
+}
+
+#[test]
+fn test_simple_query_row_len() {
+    let row = SimpleQueryRow::new(vec![Some("a".to_string()), Some("b".to_string())]);
+    assert_eq!(row.len(), 2);
+    assert!(!row.is_empty());
+
+    let empty = SimpleQueryRow::new(vec![]);
+    assert_eq!(empty.len(), 0);
+    assert!(empty.is_empty());
+}
+
+#[test]
+fn test_simple_query_message_variants() {
+    let row_msg = SimpleQueryMessage::Row(SimpleQueryRow::new(vec![Some("1".to_string())]));
+    let cmd_msg = SimpleQueryMessage::CommandComplete(5);
+
+    match row_msg {
+        SimpleQueryMessage::Row(r) => assert_eq!(r.get(0), Some("1")),
+        _ => panic!("expected Row"),
+    }
+
+    match cmd_msg {
+        SimpleQueryMessage::CommandComplete(n) => assert_eq!(n, 5),
+        _ => panic!("expected CommandComplete"),
+    }
 }

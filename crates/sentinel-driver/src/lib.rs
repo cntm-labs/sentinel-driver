@@ -41,6 +41,7 @@ pub mod config;
 pub mod connection;
 pub mod copy;
 pub mod error;
+pub mod generic_client;
 pub mod notify;
 pub mod observability;
 pub mod pipeline;
@@ -64,15 +65,19 @@ pub use connection::Connection;
 pub use copy::binary::{BinaryCopyDecoder, BinaryCopyEncoder};
 pub use copy::text::{TextCopyDecoder, TextCopyEncoder};
 pub use error::{Error, Result};
+pub use generic_client::GenericClient;
 pub use notify::Notification;
 pub use observability::{ObservabilityConfig, QueryMetrics, QueryMetricsCallback};
 pub use pool::{Pool, PoolMetrics, PooledConnection};
 pub use portal::Portal;
-pub use row::{CommandResult, Row, RowDescription};
+pub use row::{CommandResult, Row, RowDescription, SimpleQueryMessage, SimpleQueryRow};
 pub use statement::Statement;
 pub use stream::RowStream;
 pub use transaction::{IsolationLevel, TransactionConfig};
 pub use types::{FromSql, Oid, ToSql};
+
+#[cfg(feature = "with-serde-json")]
+pub use types::json::Json;
 
 // Re-export derive macros when the `derive` feature is enabled
 #[cfg(feature = "derive")]

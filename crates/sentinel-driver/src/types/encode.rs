@@ -132,8 +132,14 @@ impl ToSql for chrono::NaiveDateTime {
     }
 
     fn to_sql(&self, buf: &mut BytesMut) -> Result<()> {
-        let us = self.and_utc().timestamp_micros() - PG_EPOCH_OFFSET_US;
-        buf.put_i64(us);
+        if *self == chrono::NaiveDateTime::MAX {
+            buf.put_i64(i64::MAX);
+        } else if *self == chrono::NaiveDateTime::MIN {
+            buf.put_i64(i64::MIN);
+        } else {
+            let us = self.and_utc().timestamp_micros() - PG_EPOCH_OFFSET_US;
+            buf.put_i64(us);
+        }
         Ok(())
     }
 }
@@ -144,8 +150,14 @@ impl ToSql for chrono::DateTime<chrono::Utc> {
     }
 
     fn to_sql(&self, buf: &mut BytesMut) -> Result<()> {
-        let us = self.timestamp_micros() - PG_EPOCH_OFFSET_US;
-        buf.put_i64(us);
+        if self.naive_utc() == chrono::NaiveDateTime::MAX {
+            buf.put_i64(i64::MAX);
+        } else if self.naive_utc() == chrono::NaiveDateTime::MIN {
+            buf.put_i64(i64::MIN);
+        } else {
+            let us = self.timestamp_micros() - PG_EPOCH_OFFSET_US;
+            buf.put_i64(us);
+        }
         Ok(())
     }
 }
@@ -156,10 +168,16 @@ impl ToSql for chrono::NaiveDate {
     }
 
     fn to_sql(&self, buf: &mut BytesMut) -> Result<()> {
-        #[allow(clippy::expect_used)]
-        let epoch = chrono::NaiveDate::from_ymd_opt(2000, 1, 1).expect("PG epoch is valid");
-        let days = (*self - epoch).num_days() as i32;
-        buf.put_i32(days);
+        if *self == chrono::NaiveDate::MAX {
+            buf.put_i32(i32::MAX);
+        } else if *self == chrono::NaiveDate::MIN {
+            buf.put_i32(i32::MIN);
+        } else {
+            #[allow(clippy::expect_used)]
+            let epoch = chrono::NaiveDate::from_ymd_opt(2000, 1, 1).expect("PG epoch is valid");
+            let days = (*self - epoch).num_days() as i32;
+            buf.put_i32(days);
+        }
         Ok(())
     }
 }

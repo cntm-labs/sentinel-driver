@@ -53,11 +53,14 @@ sentinel-derive = { version = "0.1.0", path = "../sentinel-derive", optional = t
 
 # Optional type support
 rust_decimal = { version = "1", optional = true }
+serde = { version = "1", optional = true }
+serde_json = { version = "1", optional = true }
 
 [features]
 default = ["derive"]
 derive = ["dep:sentinel-derive"]
 with-rust-decimal = ["dep:rust_decimal"]
+with-serde-json = ["dep:serde", "dep:serde_json"]
 
 [lints]
 workspace = true

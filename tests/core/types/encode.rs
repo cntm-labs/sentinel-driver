@@ -217,6 +217,54 @@ fn test_encode_timestamp() {
 }
 
 #[test]
+fn test_encode_timestamp_positive_infinity() {
+    let mut buf = BytesMut::new();
+    chrono::NaiveDateTime::MAX.to_sql(&mut buf).unwrap();
+    assert_eq!(&buf[..], &i64::MAX.to_be_bytes());
+}
+
+#[test]
+fn test_encode_timestamp_negative_infinity() {
+    let mut buf = BytesMut::new();
+    chrono::NaiveDateTime::MIN.to_sql(&mut buf).unwrap();
+    assert_eq!(&buf[..], &i64::MIN.to_be_bytes());
+}
+
+#[test]
+fn test_encode_timestamptz_positive_infinity() {
+    let mut buf = BytesMut::new();
+    chrono::NaiveDateTime::MAX
+        .and_utc()
+        .to_sql(&mut buf)
+        .unwrap();
+    assert_eq!(&buf[..], &i64::MAX.to_be_bytes());
+}
+
+#[test]
+fn test_encode_timestamptz_negative_infinity() {
+    let mut buf = BytesMut::new();
+    chrono::NaiveDateTime::MIN
+        .and_utc()
+        .to_sql(&mut buf)
+        .unwrap();
+    assert_eq!(&buf[..], &i64::MIN.to_be_bytes());
+}
+
+#[test]
+fn test_encode_date_positive_infinity() {
+    let mut buf = BytesMut::new();
+    chrono::NaiveDate::MAX.to_sql(&mut buf).unwrap();
+    assert_eq!(&buf[..], &i32::MAX.to_be_bytes());
+}
+
+#[test]
+fn test_encode_date_negative_infinity() {
+    let mut buf = BytesMut::new();
+    chrono::NaiveDate::MIN.to_sql(&mut buf).unwrap();
+    assert_eq!(&buf[..], &i32::MIN.to_be_bytes());
+}
+
+#[test]
 fn test_option_some_to_sql() {
     let val: Option<i32> = Some(42);
     assert_eq!(val.oid(), Oid::INT4);

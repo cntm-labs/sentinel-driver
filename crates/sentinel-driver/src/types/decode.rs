@@ -122,6 +122,12 @@ impl FromSql for chrono::NaiveDateTime {
 
     fn from_sql(buf: &[u8]) -> Result<Self> {
         let us_from_pg_epoch = i64::from_sql(buf)?;
+        if us_from_pg_epoch == i64::MAX {
+            return Ok(chrono::NaiveDateTime::MAX);
+        }
+        if us_from_pg_epoch == i64::MIN {
+            return Ok(chrono::NaiveDateTime::MIN);
+        }
         let us_from_unix_epoch = us_from_pg_epoch + PG_EPOCH_OFFSET_US;
         let secs = us_from_unix_epoch.div_euclid(1_000_000);
         let nsecs = (us_from_unix_epoch.rem_euclid(1_000_000) * 1000) as u32;
@@ -138,6 +144,12 @@ impl FromSql for chrono::DateTime<chrono::Utc> {
 
     fn from_sql(buf: &[u8]) -> Result<Self> {
         let us_from_pg_epoch = i64::from_sql(buf)?;
+        if us_from_pg_epoch == i64::MAX {
+            return Ok(chrono::NaiveDateTime::MAX.and_utc());
+        }
+        if us_from_pg_epoch == i64::MIN {
+            return Ok(chrono::NaiveDateTime::MIN.and_utc());
+        }
         let us_from_unix_epoch = us_from_pg_epoch + PG_EPOCH_OFFSET_US;
         let secs = us_from_unix_epoch.div_euclid(1_000_000);
         let nsecs = (us_from_unix_epoch.rem_euclid(1_000_000) * 1000) as u32;
@@ -153,6 +165,12 @@ impl FromSql for chrono::NaiveDate {
 
     fn from_sql(buf: &[u8]) -> Result<Self> {
         let days = i32::from_sql(buf)?;
+        if days == i32::MAX {
+            return Ok(chrono::NaiveDate::MAX);
+        }
+        if days == i32::MIN {
+            return Ok(chrono::NaiveDate::MIN);
+        }
         #[allow(clippy::expect_used)]
         let epoch = chrono::NaiveDate::from_ymd_opt(2000, 1, 1).expect("PG epoch is valid");
         epoch
