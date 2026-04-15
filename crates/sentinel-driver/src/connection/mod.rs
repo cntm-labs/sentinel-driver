@@ -22,7 +22,7 @@ use crate::notify::{self, Notification};
 use crate::pipeline::{self, batch::PipelineBatch};
 use crate::protocol::backend::{BackendMessage, TransactionStatus};
 use crate::protocol::frontend;
-use crate::row::{self, CommandResult, Row, RowDescription};
+use crate::row::{Row, RowDescription};
 use crate::statement::Statement;
 use crate::transaction::TransactionConfig;
 use crate::types::{Oid, ToSql};

@@ -165,3 +165,59 @@ pub struct CommandResult {
     pub command: String,
     pub rows_affected: u64,
 }
+
+/// A message returned from the simple query protocol.
+///
+/// Simple queries can return a mix of row data and command completions
+/// (e.g., a multi-statement query like `"SELECT 1; INSERT INTO ..."`).
+#[derive(Debug, Clone)]
+pub enum SimpleQueryMessage {
+    /// A row of text-format data from a SELECT or RETURNING clause.
+    Row(SimpleQueryRow),
+    /// A command completed (INSERT, UPDATE, DELETE, etc.).
+    CommandComplete(u64),
+}
+
+/// A single row from the simple query protocol.
+///
+/// All column values are in PostgreSQL text format. NULL values are
+/// represented as `None`.
+#[derive(Debug, Clone)]
+pub struct SimpleQueryRow {
+    columns: Vec<Option<String>>,
+}
+
+impl SimpleQueryRow {
+    pub(crate) fn new(columns: Vec<Option<String>>) -> Self {
+        Self { columns }
+    }
+
+    /// Get a column value by index. Returns `None` for NULL.
+    pub fn get(&self, idx: usize) -> Option<&str> {
+        self.columns.get(idx).and_then(|c| c.as_deref())
+    }
+
+    /// Get a column value by index, returning an error if the index is
+    /// out of bounds or the value is NULL.
+    pub fn try_get(&self, idx: usize) -> Result<&str> {
+        if idx >= self.columns.len() {
+            return Err(Error::ColumnIndex {
+                index: idx,
+                count: self.columns.len(),
+            });
+        }
+        self.columns[idx]
+            .as_deref()
+            .ok_or_else(|| Error::Decode("unexpected NULL in simple query row".into()))
+    }
+
+    /// Number of columns in this row.
+    pub fn len(&self) -> usize {
+        self.columns.len()
+    }
+
+    /// Returns `true` if this row has no columns.
+    pub fn is_empty(&self) -> bool {
+        self.columns.is_empty()
+    }
+}

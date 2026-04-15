@@ -5,6 +5,8 @@ pub mod encode;
 pub mod geometric;
 pub mod hstore;
 pub mod interval;
+#[cfg(feature = "with-serde-json")]
+pub mod json;
 pub mod lsn;
 pub mod money;
 pub mod network;
