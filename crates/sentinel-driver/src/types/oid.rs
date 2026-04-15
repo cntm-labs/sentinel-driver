@@ -16,6 +16,8 @@ impl Oid {
     pub const VARCHAR: Oid = Oid(1043);
     pub const DATE: Oid = Oid(1082);
     pub const TIME: Oid = Oid(1083);
+    pub const TIMETZ: Oid = Oid(1266);
+    pub const TIMETZ_ARRAY: Oid = Oid(1270);
     pub const TIMESTAMP: Oid = Oid(1114);
     pub const TIMESTAMPTZ: Oid = Oid(1184);
     pub const UUID: Oid = Oid(2950);
@@ -43,6 +45,18 @@ impl Oid {
     pub const TSRANGE_ARRAY: Oid = Oid(3909);
     pub const TSTZRANGE_ARRAY: Oid = Oid(3911);
     pub const DATERANGE_ARRAY: Oid = Oid(3913);
+    pub const INT4MULTIRANGE: Oid = Oid(4451);
+    pub const INT8MULTIRANGE: Oid = Oid(4536);
+    pub const NUMMULTIRANGE: Oid = Oid(4532);
+    pub const TSMULTIRANGE: Oid = Oid(4533);
+    pub const TSTZMULTIRANGE: Oid = Oid(4534);
+    pub const DATEMULTIRANGE: Oid = Oid(4535);
+    pub const INT4MULTIRANGE_ARRAY: Oid = Oid(6150);
+    pub const INT8MULTIRANGE_ARRAY: Oid = Oid(6157);
+    pub const NUMMULTIRANGE_ARRAY: Oid = Oid(6151);
+    pub const TSMULTIRANGE_ARRAY: Oid = Oid(6152);
+    pub const TSTZMULTIRANGE_ARRAY: Oid = Oid(6153);
+    pub const DATEMULTIRANGE_ARRAY: Oid = Oid(6155);
     pub const MONEY: Oid = Oid(790);
     pub const MONEY_ARRAY: Oid = Oid(791);
     pub const POINT: Oid = Oid(600);
@@ -52,6 +66,8 @@ impl Oid {
     pub const PATH: Oid = Oid(602);
     pub const POLYGON: Oid = Oid(604);
     pub const CIRCLE: Oid = Oid(718);
+    pub const MACADDR8: Oid = Oid(774);
+    pub const MACADDR8_ARRAY: Oid = Oid(775);
     pub const XML: Oid = Oid(142);
     pub const XML_ARRAY: Oid = Oid(143);
     pub const PG_LSN: Oid = Oid(3220);
@@ -63,6 +79,7 @@ impl Oid {
 
     // Array types
     pub const BOOL_ARRAY: Oid = Oid(1000);
+    pub const BYTEA_ARRAY: Oid = Oid(1001);
     pub const INT2_ARRAY: Oid = Oid(1005);
     pub const INT4_ARRAY: Oid = Oid(1007);
     pub const INT8_ARRAY: Oid = Oid(1016);
@@ -70,6 +87,14 @@ impl Oid {
     pub const FLOAT8_ARRAY: Oid = Oid(1022);
     pub const TEXT_ARRAY: Oid = Oid(1009);
     pub const VARCHAR_ARRAY: Oid = Oid(1015);
+    pub const TIMESTAMP_ARRAY: Oid = Oid(1115);
+    pub const TIMESTAMPTZ_ARRAY: Oid = Oid(1185);
+    pub const DATE_ARRAY: Oid = Oid(1182);
+    pub const TIME_ARRAY: Oid = Oid(1183);
+    pub const JSON_ARRAY: Oid = Oid(199);
+    pub const JSONB_ARRAY: Oid = Oid(3807);
+    pub const POINT_ARRAY: Oid = Oid(1017);
+    pub const CIRCLE_ARRAY: Oid = Oid(719);
     pub const UUID_ARRAY: Oid = Oid(2951);
 }
 

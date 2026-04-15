@@ -171,6 +171,36 @@ impl FromSql for PgMacAddr {
     }
 }
 
+// -- PgMacAddr8 (EUI-64, PG 10+) --
+
+/// PostgreSQL MACADDR8 type -- 8-byte extended MAC address (EUI-64).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct PgMacAddr8(pub [u8; 8]);
+
+impl ToSql for PgMacAddr8 {
+    fn oid(&self) -> Oid {
+        Oid::MACADDR8
+    }
+
+    fn to_sql(&self, buf: &mut BytesMut) -> Result<()> {
+        buf.put_slice(&self.0);
+        Ok(())
+    }
+}
+
+impl FromSql for PgMacAddr8 {
+    fn oid() -> Oid {
+        Oid::MACADDR8
+    }
+
+    fn from_sql(buf: &[u8]) -> Result<Self> {
+        let arr: [u8; 8] = buf
+            .try_into()
+            .map_err(|_| Error::Decode(format!("macaddr8: expected 8 bytes, got {}", buf.len())))?;
+        Ok(PgMacAddr8(arr))
+    }
+}
+
 // -- std::net::IpAddr convenience impls --
 
 impl ToSql for IpAddr {

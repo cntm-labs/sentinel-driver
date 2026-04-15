@@ -27,7 +27,7 @@ static BUILTIN_TYPES: &[TypeInfo] = &[
     TypeInfo {
         oid: Oid::BYTEA,
         name: "bytea",
-        array_oid: None,
+        array_oid: Some(Oid::BYTEA_ARRAY),
     },
     TypeInfo {
         oid: Oid::CHAR,
@@ -77,22 +77,27 @@ static BUILTIN_TYPES: &[TypeInfo] = &[
     TypeInfo {
         oid: Oid::DATE,
         name: "date",
-        array_oid: None,
+        array_oid: Some(Oid::DATE_ARRAY),
     },
     TypeInfo {
         oid: Oid::TIME,
         name: "time",
-        array_oid: None,
+        array_oid: Some(Oid::TIME_ARRAY),
+    },
+    TypeInfo {
+        oid: Oid::TIMETZ,
+        name: "timetz",
+        array_oid: Some(Oid::TIMETZ_ARRAY),
     },
     TypeInfo {
         oid: Oid::TIMESTAMP,
         name: "timestamp",
-        array_oid: None,
+        array_oid: Some(Oid::TIMESTAMP_ARRAY),
     },
     TypeInfo {
         oid: Oid::TIMESTAMPTZ,
         name: "timestamptz",
-        array_oid: None,
+        array_oid: Some(Oid::TIMESTAMPTZ_ARRAY),
     },
     TypeInfo {
         oid: Oid::UUID,
@@ -102,12 +107,12 @@ static BUILTIN_TYPES: &[TypeInfo] = &[
     TypeInfo {
         oid: Oid::JSON,
         name: "json",
-        array_oid: None,
+        array_oid: Some(Oid::JSON_ARRAY),
     },
     TypeInfo {
         oid: Oid::JSONB,
         name: "jsonb",
-        array_oid: None,
+        array_oid: Some(Oid::JSONB_ARRAY),
     },
     TypeInfo {
         oid: Oid::INTERVAL,
@@ -128,6 +133,11 @@ static BUILTIN_TYPES: &[TypeInfo] = &[
         oid: Oid::MACADDR,
         name: "macaddr",
         array_oid: Some(Oid::MACADDR_ARRAY),
+    },
+    TypeInfo {
+        oid: Oid::MACADDR8,
+        name: "macaddr8",
+        array_oid: Some(Oid::MACADDR8_ARRAY),
     },
     TypeInfo {
         oid: Oid::NUMERIC,
@@ -165,6 +175,36 @@ static BUILTIN_TYPES: &[TypeInfo] = &[
         array_oid: Some(Oid::DATERANGE_ARRAY),
     },
     TypeInfo {
+        oid: Oid::INT4MULTIRANGE,
+        name: "int4multirange",
+        array_oid: Some(Oid::INT4MULTIRANGE_ARRAY),
+    },
+    TypeInfo {
+        oid: Oid::INT8MULTIRANGE,
+        name: "int8multirange",
+        array_oid: Some(Oid::INT8MULTIRANGE_ARRAY),
+    },
+    TypeInfo {
+        oid: Oid::NUMMULTIRANGE,
+        name: "nummultirange",
+        array_oid: Some(Oid::NUMMULTIRANGE_ARRAY),
+    },
+    TypeInfo {
+        oid: Oid::TSMULTIRANGE,
+        name: "tsmultirange",
+        array_oid: Some(Oid::TSMULTIRANGE_ARRAY),
+    },
+    TypeInfo {
+        oid: Oid::TSTZMULTIRANGE,
+        name: "tstzmultirange",
+        array_oid: Some(Oid::TSTZMULTIRANGE_ARRAY),
+    },
+    TypeInfo {
+        oid: Oid::DATEMULTIRANGE,
+        name: "datemultirange",
+        array_oid: Some(Oid::DATEMULTIRANGE_ARRAY),
+    },
+    TypeInfo {
         oid: Oid::MONEY,
         name: "money",
         array_oid: Some(Oid::MONEY_ARRAY),
@@ -172,7 +212,7 @@ static BUILTIN_TYPES: &[TypeInfo] = &[
     TypeInfo {
         oid: Oid::POINT,
         name: "point",
-        array_oid: None,
+        array_oid: Some(Oid::POINT_ARRAY),
     },
     TypeInfo {
         oid: Oid::LINE,
@@ -192,7 +232,7 @@ static BUILTIN_TYPES: &[TypeInfo] = &[
     TypeInfo {
         oid: Oid::CIRCLE,
         name: "circle",
-        array_oid: None,
+        array_oid: Some(Oid::CIRCLE_ARRAY),
     },
     TypeInfo {
         oid: Oid::XML,
