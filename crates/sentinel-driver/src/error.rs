@@ -69,6 +69,14 @@ pub enum Error {
     /// Transaction already completed (committed or rolled back).
     #[error("transaction already completed")]
     TransactionCompleted,
+
+    /// All configured hosts failed to connect.
+    #[error("all hosts failed: {0}")]
+    AllHostsFailed(String),
+
+    /// Connected server does not match required session attributes.
+    #[error("wrong session attributes: {0}")]
+    WrongSessionAttrs(String),
 }
 
 /// PostgreSQL server error details.

@@ -37,6 +37,8 @@ use stream::PgConnection;
 pub struct Connection {
     pub(crate) conn: PgConnection,
     pub(crate) config: Config,
+    pub(crate) connected_host: String,
+    pub(crate) connected_port: u16,
     pub(crate) process_id: i32,
     pub(crate) secret_key: i32,
     pub(crate) transaction_status: TransactionStatus,

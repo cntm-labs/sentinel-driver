@@ -60,7 +60,7 @@ pub mod types;
 pub use advisory_lock::{PgAdvisoryLock, PgAdvisoryLockGuard};
 pub use cache::{CacheMetrics, StatementCache};
 pub use cancel::CancelToken;
-pub use config::{ChannelBinding, Config, SslMode};
+pub use config::{ChannelBinding, Config, LoadBalanceHosts, SslMode, TargetSessionAttrs};
 pub use connection::Connection;
 pub use copy::binary::{BinaryCopyDecoder, BinaryCopyEncoder};
 pub use copy::text::{TextCopyDecoder, TextCopyEncoder};

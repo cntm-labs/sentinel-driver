@@ -6,6 +6,9 @@ use tokio::io::{self, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBu
 use tokio::net::TcpStream;
 use tokio_rustls::client::TlsStream;
 
+#[cfg(unix)]
+use tokio::net::UnixStream;
+
 use crate::config::{Config, SslMode};
 use crate::error::{Error, Result};
 use crate::protocol::backend::BackendMessage;
@@ -13,10 +16,12 @@ use crate::protocol::codec;
 use crate::protocol::frontend;
 use crate::tls;
 
-/// Unified stream that can be either plain TCP or TLS-wrapped TCP.
+/// Unified stream that can be plain TCP, TLS-wrapped TCP, or Unix domain socket.
 pub(crate) enum PgStream {
     Tcp(TcpStream),
     Tls(Box<TlsStream<TcpStream>>),
+    #[cfg(unix)]
+    Unix(UnixStream),
 }
 
 impl AsyncRead for PgStream {
@@ -28,6 +33,8 @@ impl AsyncRead for PgStream {
         match self.get_mut() {
             PgStream::Tcp(s) => Pin::new(s).poll_read(cx, buf),
             PgStream::Tls(s) => Pin::new(s).poll_read(cx, buf),
+            #[cfg(unix)]
+            PgStream::Unix(s) => Pin::new(s).poll_read(cx, buf),
         }
     }
 }
@@ -41,6 +48,8 @@ impl AsyncWrite for PgStream {
         match self.get_mut() {
             PgStream::Tcp(s) => Pin::new(s).poll_write(cx, buf),
             PgStream::Tls(s) => Pin::new(s).poll_write(cx, buf),
+            #[cfg(unix)]
+            PgStream::Unix(s) => Pin::new(s).poll_write(cx, buf),
         }
     }
 
@@ -48,6 +57,8 @@ impl AsyncWrite for PgStream {
         match self.get_mut() {
             PgStream::Tcp(s) => Pin::new(s).poll_flush(cx),
             PgStream::Tls(s) => Pin::new(s).poll_flush(cx),
+            #[cfg(unix)]
+            PgStream::Unix(s) => Pin::new(s).poll_flush(cx),
         }
     }
 
@@ -55,6 +66,8 @@ impl AsyncWrite for PgStream {
         match self.get_mut() {
             PgStream::Tcp(s) => Pin::new(s).poll_shutdown(cx),
             PgStream::Tls(s) => Pin::new(s).poll_shutdown(cx),
+            #[cfg(unix)]
+            PgStream::Unix(s) => Pin::new(s).poll_shutdown(cx),
         }
     }
 }
@@ -67,9 +80,24 @@ pub(crate) struct PgConnection {
 }
 
 impl PgConnection {
-    /// Connect to PostgreSQL, performing TCP connection and optional TLS upgrade.
-    pub async fn connect(config: &Config) -> Result<Self> {
-        let addr = format!("{}:{}", config.host(), config.port());
+    /// Connect to a single host, performing TCP (or Unix) connection and optional TLS upgrade.
+    pub async fn connect_host(config: &Config, host: &str, port: u16) -> Result<Self> {
+        let stream = if is_unix_socket(host) {
+            Self::connect_unix(config, host, port).await?
+        } else {
+            Self::connect_tcp(config, host, port).await?
+        };
+
+        Ok(Self {
+            stream,
+            read_buf: BytesMut::with_capacity(8192),
+            write_buf: BytesMut::with_capacity(8192),
+        })
+    }
+
+    /// Connect via TCP with optional TLS upgrade.
+    async fn connect_tcp(config: &Config, host: &str, port: u16) -> Result<PgStream> {
+        let addr = format!("{host}:{port}");
 
         let tcp = tokio::time::timeout(config.connect_timeout(), TcpStream::connect(&addr))
             .await
@@ -126,11 +154,29 @@ impl PgConnection {
             None => PgStream::Tcp(tcp),
         };
 
-        Ok(Self {
-            stream,
-            read_buf: BytesMut::with_capacity(8192),
-            write_buf: BytesMut::with_capacity(8192),
-        })
+        Ok(stream)
+    }
+
+    /// Connect via Unix domain socket.
+    #[cfg(unix)]
+    async fn connect_unix(config: &Config, host: &str, port: u16) -> Result<PgStream> {
+        let socket_path = format!("{host}/.s.PGSQL.{port}");
+
+        let unix =
+            tokio::time::timeout(config.connect_timeout(), UnixStream::connect(&socket_path))
+                .await
+                .map_err(|_| Error::Timeout(format!("connect timeout to {socket_path}")))?
+                .map_err(Error::Io)?;
+
+        Ok(PgStream::Unix(unix))
+    }
+
+    /// Unix socket connect is not available on non-Unix platforms.
+    #[cfg(not(unix))]
+    async fn connect_unix(_config: &Config, host: &str, _port: u16) -> Result<PgStream> {
+        Err(Error::Config(format!(
+            "Unix domain sockets are not supported on this platform: {host}"
+        )))
     }
 
     /// Get a mutable reference to the write buffer for encoding messages.
@@ -196,6 +242,12 @@ impl PgConnection {
         matches!(self.stream, PgStream::Tls(_))
     }
 
+    /// Returns `true` if connected via Unix domain socket.
+    #[cfg(unix)]
+    pub fn is_unix(&self) -> bool {
+        matches!(self.stream, PgStream::Unix(_))
+    }
+
     /// Extract the DER-encoded server certificate from the TLS session.
     ///
     /// Returns `None` if not using TLS or no peer certificates available.
@@ -208,6 +260,13 @@ impl PgConnection {
                     .map(|cert| cert.as_ref().to_vec())
             }
             PgStream::Tcp(_) => None,
+            #[cfg(unix)]
+            PgStream::Unix(_) => None,
         }
     }
+}
+
+/// Returns `true` if the host string represents a Unix domain socket path.
+pub(crate) fn is_unix_socket(host: &str) -> bool {
+    host.starts_with('/')
 }

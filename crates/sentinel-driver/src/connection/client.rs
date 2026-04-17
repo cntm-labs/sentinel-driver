@@ -2,17 +2,59 @@ use super::{
     pipeline, startup, BackendMessage, BytesMut, CancelToken, Config, Connection, Duration, Error,
     PgConnection, PipelineBatch, Result, StatementCache, ToSql, TransactionStatus,
 };
+use crate::config::{LoadBalanceHosts, TargetSessionAttrs};
 
 impl Connection {
     /// Connect to PostgreSQL and perform the startup handshake.
+    ///
+    /// With multiple hosts configured, tries each host in order (or shuffled
+    /// if `load_balance_hosts=random`) until one succeeds and matches the
+    /// required `target_session_attrs`.
     pub async fn connect(config: Config) -> Result<Self> {
-        let mut conn = PgConnection::connect(&config).await?;
-        let result = startup::startup(&mut conn, &config).await?;
+        let mut hosts: Vec<(String, u16)> = config.hosts().to_vec();
+
+        if hosts.is_empty() {
+            hosts.push(("localhost".to_string(), 5432));
+        }
+
+        if config.load_balance_hosts() == LoadBalanceHosts::Random {
+            use rand::seq::SliceRandom;
+            use rand::thread_rng;
+            hosts.shuffle(&mut thread_rng());
+        }
+
+        let mut last_error: Option<Error> = None;
+
+        for (host, port) in &hosts {
+            match Self::try_connect_host(&config, host, *port).await {
+                Ok(conn) => return Ok(conn),
+                Err(e) => {
+                    tracing::debug!(host = %host, port = %port, error = %e, "host failed");
+                    last_error = Some(e);
+                }
+            }
+        }
+
+        Err(last_error.unwrap_or_else(|| Error::AllHostsFailed("no hosts configured".to_string())))
+    }
+
+    /// Try connecting to a single host, performing startup and session attrs check.
+    async fn try_connect_host(config: &Config, host: &str, port: u16) -> Result<Self> {
+        let mut conn = PgConnection::connect_host(config, host, port).await?;
+        let result = startup::startup(&mut conn, config).await?;
+
+        // Check target_session_attrs after successful auth
+        if config.target_session_attrs() != TargetSessionAttrs::Any {
+            startup::check_session_attrs(&mut conn, config.target_session_attrs()).await?;
+        }
+
         let query_timeout = config.statement_timeout();
 
         Ok(Self {
             conn,
-            config,
+            config: config.clone(),
+            connected_host: host.to_string(),
+            connected_port: port,
             process_id: result.process_id,
             secret_key: result.secret_key,
             transaction_status: result.transaction_status,
@@ -33,16 +75,37 @@ impl Connection {
     /// running query. See [`CancelToken`] for details.
     pub fn cancel_token(&self) -> CancelToken {
         CancelToken::new(
-            self.config.host(),
-            self.config.port(),
+            &self.connected_host,
+            self.connected_port,
             self.process_id,
             self.secret_key,
         )
     }
 
     /// Returns `true` if the connection is using TLS.
+    /// Returns the configuration used for this connection.
+    pub fn config(&self) -> &Config {
+        &self.config
+    }
+
+    /// Returns the host this connection is connected to.
+    pub fn connected_host(&self) -> &str {
+        &self.connected_host
+    }
+
+    /// Returns the port this connection is connected to.
+    pub fn connected_port(&self) -> u16 {
+        self.connected_port
+    }
+
     pub fn is_tls(&self) -> bool {
         self.conn.is_tls()
+    }
+
+    /// Returns `true` if connected via Unix domain socket.
+    #[cfg(unix)]
+    pub fn is_unix(&self) -> bool {
+        self.conn.is_unix()
     }
 
     /// The server process ID for this connection.
@@ -66,32 +129,6 @@ impl Connection {
     /// Current transaction status.
     pub fn transaction_status(&self) -> TransactionStatus {
         self.transaction_status
-    }
-
-    // ── Internal constructors (for pool) ──────────────
-
-    /// Create a Connection from raw parts after startup handshake.
-    ///
-    /// Used by the connection pool which manages the connect + startup
-    /// lifecycle separately.
-    pub(crate) fn from_raw_parts(
-        conn: PgConnection,
-        config: Config,
-        process_id: i32,
-        secret_key: i32,
-        transaction_status: TransactionStatus,
-    ) -> Self {
-        let query_timeout = config.statement_timeout();
-        Self {
-            conn,
-            config,
-            process_id,
-            secret_key,
-            transaction_status,
-            stmt_cache: StatementCache::new(),
-            query_timeout,
-            is_broken: false,
-        }
     }
 
     /// Access the underlying PgConnection mutably.
