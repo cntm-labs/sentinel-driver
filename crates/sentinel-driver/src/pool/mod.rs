@@ -9,8 +9,6 @@ use tokio::sync::{Mutex, Semaphore};
 use tracing::debug;
 
 use crate::config::Config;
-use crate::connection::startup;
-use crate::connection::stream::PgConnection;
 use crate::error::{Error, Result};
 use crate::pool::config::PoolConfig;
 use crate::pool::health::{ConnectionMeta, HealthCheckStrategy};
@@ -245,16 +243,7 @@ impl Pool {
     // ── Internal ─────────────────────────────────────
 
     async fn create_connection(&self) -> Result<(Connection, ConnectionMeta)> {
-        let mut pg_conn = PgConnection::connect(&self.shared.config).await?;
-        let result = startup::startup(&mut pg_conn, &self.shared.config).await?;
-
-        let mut conn = Connection::from_raw_parts(
-            pg_conn,
-            self.shared.config.clone(),
-            result.process_id,
-            result.secret_key,
-            result.transaction_status,
-        );
+        let mut conn = Connection::connect(self.shared.config.clone()).await?;
 
         // Run after_connect callback
         if let Some(ref cb) = self.shared.pool_config.after_connect {

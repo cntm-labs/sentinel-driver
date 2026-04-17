@@ -1,7 +1,9 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use sentinel_driver::config::{ChannelBinding, Config, SslMode};
+use sentinel_driver::config::{
+    ChannelBinding, Config, LoadBalanceHosts, SslMode, TargetSessionAttrs,
+};
 
 #[test]
 fn parse_basic_connection_string() {
@@ -175,4 +177,156 @@ fn test_parse_invalid_channel_binding() {
 fn test_parse_invalid_ssldirect() {
     let result = Config::parse("postgres://u:p@host/db?ssldirect=maybe");
     assert!(result.is_err());
+}
+
+// --- Phase 4C: Multi-host, LoadBalanceHosts, TargetSessionAttrs, Unix socket ---
+
+#[test]
+fn parse_multi_host_connection_string() {
+    let config =
+        Config::parse("postgres://user:pass@host1:5432,host2:5433,host3:5434/mydb").unwrap();
+    let hosts = config.hosts();
+    assert_eq!(hosts.len(), 3);
+    assert_eq!(hosts[0], ("host1".to_string(), 5432));
+    assert_eq!(hosts[1], ("host2".to_string(), 5433));
+    assert_eq!(hosts[2], ("host3".to_string(), 5434));
+    // Backward-compat: host() returns first host
+    assert_eq!(config.host(), "host1");
+    assert_eq!(config.port(), 5432);
+}
+
+#[test]
+fn parse_multi_host_default_port() {
+    let config = Config::parse("postgres://user:pass@host1,host2:5433/db").unwrap();
+    let hosts = config.hosts();
+    assert_eq!(hosts.len(), 2);
+    assert_eq!(hosts[0], ("host1".to_string(), 5432));
+    assert_eq!(hosts[1], ("host2".to_string(), 5433));
+}
+
+#[test]
+fn parse_single_host_still_works() {
+    let config = Config::parse("postgres://user:pass@localhost:5432/mydb").unwrap();
+    let hosts = config.hosts();
+    assert_eq!(hosts.len(), 1);
+    assert_eq!(hosts[0], ("localhost".to_string(), 5432));
+    assert_eq!(config.host(), "localhost");
+    assert_eq!(config.port(), 5432);
+}
+
+#[test]
+fn parse_load_balance_hosts_random() {
+    let config = Config::parse("postgres://u:p@h1,h2/db?load_balance_hosts=random").unwrap();
+    assert_eq!(config.load_balance_hosts(), LoadBalanceHosts::Random);
+}
+
+#[test]
+fn parse_load_balance_hosts_disable() {
+    let config = Config::parse("postgres://u:p@h1,h2/db?load_balance_hosts=disable").unwrap();
+    assert_eq!(config.load_balance_hosts(), LoadBalanceHosts::Disable);
+}
+
+#[test]
+fn parse_invalid_load_balance_hosts() {
+    let result = Config::parse("postgres://u:p@h1/db?load_balance_hosts=invalid");
+    assert!(result.is_err());
+}
+
+#[test]
+fn parse_target_session_attrs_read_write() {
+    let config = Config::parse("postgres://u:p@host/db?target_session_attrs=read-write").unwrap();
+    assert_eq!(config.target_session_attrs(), TargetSessionAttrs::ReadWrite);
+}
+
+#[test]
+fn parse_target_session_attrs_read_only() {
+    let config = Config::parse("postgres://u:p@host/db?target_session_attrs=read-only").unwrap();
+    assert_eq!(config.target_session_attrs(), TargetSessionAttrs::ReadOnly);
+}
+
+#[test]
+fn parse_target_session_attrs_any() {
+    let config = Config::parse("postgres://u:p@host/db?target_session_attrs=any").unwrap();
+    assert_eq!(config.target_session_attrs(), TargetSessionAttrs::Any);
+}
+
+#[test]
+fn builder_multi_host_appends() {
+    let config = Config::builder()
+        .host("primary.pg.example.com")
+        .host("replica1.pg.example.com")
+        .port(5432)
+        .user("test")
+        .build();
+    let hosts = config.hosts();
+    assert_eq!(hosts.len(), 2);
+    assert_eq!(hosts[0].0, "primary.pg.example.com");
+    assert_eq!(hosts[1].0, "replica1.pg.example.com");
+}
+
+#[test]
+fn builder_load_balance_hosts() {
+    let config = Config::builder()
+        .user("test")
+        .load_balance_hosts(LoadBalanceHosts::Random)
+        .build();
+    assert_eq!(config.load_balance_hosts(), LoadBalanceHosts::Random);
+}
+
+#[test]
+fn builder_load_balance_hosts_default_disable() {
+    let config = Config::builder().user("test").build();
+    assert_eq!(config.load_balance_hosts(), LoadBalanceHosts::Disable);
+}
+
+#[test]
+fn builder_target_session_attrs() {
+    let config = Config::builder()
+        .user("test")
+        .target_session_attrs(TargetSessionAttrs::ReadWrite)
+        .build();
+    assert_eq!(config.target_session_attrs(), TargetSessionAttrs::ReadWrite);
+}
+
+#[test]
+fn builder_target_session_attrs_default_any() {
+    let config = Config::builder().user("test").build();
+    assert_eq!(config.target_session_attrs(), TargetSessionAttrs::Any);
+}
+
+#[cfg(unix)]
+#[test]
+fn parse_unix_socket_host() {
+    let config = Config::parse("postgres://user@/db?host=/var/run/postgresql").unwrap();
+    let hosts = config.hosts();
+    assert_eq!(hosts.len(), 1);
+    assert_eq!(hosts[0].0, "/var/run/postgresql");
+    assert_eq!(hosts[0].1, 5432);
+}
+
+#[cfg(unix)]
+#[test]
+fn builder_unix_socket_host() {
+    let config = Config::builder()
+        .host("/var/run/postgresql")
+        .port(5433)
+        .user("test")
+        .database("mydb")
+        .build();
+    let hosts = config.hosts();
+    assert_eq!(hosts.len(), 1);
+    assert_eq!(hosts[0].0, "/var/run/postgresql");
+    assert_eq!(hosts[0].1, 5433);
+}
+
+#[test]
+fn parse_multi_host_with_all_params() {
+    let config = Config::parse(
+        "postgres://user:pass@h1:5432,h2:5433/db?target_session_attrs=read-write&load_balance_hosts=random",
+    )
+    .unwrap();
+    let hosts = config.hosts();
+    assert_eq!(hosts.len(), 2);
+    assert_eq!(config.target_session_attrs(), TargetSessionAttrs::ReadWrite);
+    assert_eq!(config.load_balance_hosts(), LoadBalanceHosts::Random);
 }

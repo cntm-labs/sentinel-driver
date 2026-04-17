@@ -42,8 +42,7 @@ pub enum SslMode {
 /// ```
 #[derive(Debug, Clone)]
 pub struct Config {
-    pub(crate) host: String,
-    pub(crate) port: u16,
+    pub(crate) hosts: Vec<(String, u16)>,
     pub(crate) database: String,
     pub(crate) user: String,
     pub(crate) password: Option<String>,
@@ -53,8 +52,9 @@ pub struct Config {
     pub(crate) statement_timeout: Option<Duration>,
     pub(crate) _keepalive: Option<Duration>,
     pub(crate) _keepalive_idle: Option<Duration>,
-    pub(crate) _target_session_attrs: TargetSessionAttrs,
+    pub(crate) target_session_attrs: TargetSessionAttrs,
     pub(crate) _extra_float_digits: Option<i32>,
+    pub(crate) load_balance_hosts: LoadBalanceHosts,
     /// Path to client certificate file for certificate authentication.
     pub(crate) ssl_client_cert: Option<std::path::PathBuf>,
     /// Path to client private key file for certificate authentication.
@@ -87,6 +87,16 @@ pub enum TargetSessionAttrs {
     ReadWrite,
     /// Only accept read-only servers (replica).
     ReadOnly,
+}
+
+/// Load balancing strategy for multi-host connections.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum LoadBalanceHosts {
+    /// Try hosts in order (default).
+    #[default]
+    Disable,
+    /// Shuffle hosts before trying.
+    Random,
 }
 
 impl Config {
@@ -126,15 +136,24 @@ impl Config {
             None => (rest, None),
         };
 
-        let (host, port) = match hostport.rsplit_once(':') {
-            Some((h, p)) => {
-                let port: u16 = p
-                    .parse()
-                    .map_err(|_| Error::Config(format!("invalid port: {p}")))?;
-                (h.to_string(), port)
+        // Parse comma-separated host:port pairs
+        let mut hosts: Vec<(String, u16)> = Vec::new();
+        if hostport.is_empty() {
+            // Empty host — will be set via ?host= parameter (Unix socket)
+        } else {
+            for entry in hostport.split(',') {
+                let (h, p) = match entry.rsplit_once(':') {
+                    Some((h, p)) => {
+                        let port: u16 = p
+                            .parse()
+                            .map_err(|_| Error::Config(format!("invalid port: {p}")))?;
+                        (h.to_string(), port)
+                    }
+                    None => (entry.to_string(), 5432),
+                };
+                hosts.push((h, p));
             }
-            None => (hostport.to_string(), 5432),
-        };
+        }
 
         let (database, params_str) = match db_and_params {
             Some(dp) => match dp.split_once('?') {
@@ -144,11 +163,11 @@ impl Config {
             None => (String::new(), None),
         };
 
-        let mut config = ConfigBuilder::new()
-            .host(host)
-            .port(port)
-            .database(database)
-            .user(user);
+        let mut config = ConfigBuilder::new();
+        for (h, p) in &hosts {
+            config = config.host_port(h.clone(), *p);
+        }
+        config = config.database(database).user(user);
 
         if let Some(pw) = password {
             config = config.password(pw);
@@ -226,6 +245,21 @@ impl Config {
                             }
                         });
                     }
+                    "load_balance_hosts" => {
+                        config = config.load_balance_hosts(match value.as_str() {
+                            "disable" => LoadBalanceHosts::Disable,
+                            "random" => LoadBalanceHosts::Random,
+                            _ => {
+                                return Err(Error::Config(format!(
+                                    "invalid load_balance_hosts: {value}"
+                                )))
+                            }
+                        });
+                    }
+                    "host" => {
+                        // Support ?host=/var/run/postgresql for Unix sockets
+                        config = config.host_port(value, 5432);
+                    }
                     _ => {
                         // Ignore unknown parameters for forward compatibility
                     }
@@ -243,12 +277,29 @@ impl Config {
 
     // Accessor methods
 
+    /// Returns the first host (for backward compatibility and single-host use).
     pub fn host(&self) -> &str {
-        &self.host
+        self.hosts.first().map_or("localhost", |(h, _)| h.as_str())
     }
 
+    /// Returns the first port (for backward compatibility and single-host use).
     pub fn port(&self) -> u16 {
-        self.port
+        self.hosts.first().map_or(5432, |(_, p)| *p)
+    }
+
+    /// Returns all configured host/port pairs.
+    pub fn hosts(&self) -> &[(String, u16)] {
+        &self.hosts
+    }
+
+    /// Load balancing strategy for multi-host connections.
+    pub fn load_balance_hosts(&self) -> LoadBalanceHosts {
+        self.load_balance_hosts
+    }
+
+    /// Target session attributes for connection routing.
+    pub fn target_session_attrs(&self) -> TargetSessionAttrs {
+        self.target_session_attrs
     }
 
     pub fn database(&self) -> &str {
@@ -303,8 +354,8 @@ impl Config {
 /// Builder for [`Config`].
 #[derive(Debug, Clone)]
 pub struct ConfigBuilder {
-    host: String,
-    port: u16,
+    hosts: Vec<(String, u16)>,
+    default_port: u16,
     database: String,
     user: String,
     password: Option<String>,
@@ -316,6 +367,7 @@ pub struct ConfigBuilder {
     keepalive_idle: Option<Duration>,
     target_session_attrs: TargetSessionAttrs,
     extra_float_digits: Option<i32>,
+    load_balance_hosts: LoadBalanceHosts,
     ssl_client_cert: Option<PathBuf>,
     ssl_client_key: Option<PathBuf>,
     ssl_direct: bool,
@@ -325,8 +377,8 @@ pub struct ConfigBuilder {
 impl ConfigBuilder {
     fn new() -> Self {
         Self {
-            host: "localhost".to_string(),
-            port: 5432,
+            hosts: Vec::new(),
+            default_port: 5432,
             database: String::new(),
             user: String::new(),
             password: None,
@@ -338,6 +390,7 @@ impl ConfigBuilder {
             keepalive_idle: None,
             target_session_attrs: TargetSessionAttrs::default(),
             extra_float_digits: Some(3),
+            load_balance_hosts: LoadBalanceHosts::default(),
             ssl_client_cert: None,
             ssl_client_key: None,
             ssl_direct: false,
@@ -345,13 +398,33 @@ impl ConfigBuilder {
         }
     }
 
+    /// Append a host with the current default port.
     pub fn host(mut self, host: impl Into<String>) -> Self {
-        self.host = host.into();
+        self.hosts.push((host.into(), self.default_port));
         self
     }
 
+    /// Append a host with a specific port.
+    pub fn host_port(mut self, host: impl Into<String>, port: u16) -> Self {
+        self.hosts.push((host.into(), port));
+        self
+    }
+
+    /// Set the default port for subsequent `.host()` calls and update
+    /// any hosts that still have the old default port.
     pub fn port(mut self, port: u16) -> Self {
-        self.port = port;
+        let old_default = self.default_port;
+        self.default_port = port;
+        for (_, p) in &mut self.hosts {
+            if *p == old_default {
+                *p = port;
+            }
+        }
+        self
+    }
+
+    pub fn load_balance_hosts(mut self, strategy: LoadBalanceHosts) -> Self {
+        self.load_balance_hosts = strategy;
         self
     }
 
@@ -426,9 +499,13 @@ impl ConfigBuilder {
 
     /// Build the final `Config`.
     pub fn build(self) -> Config {
+        let hosts = if self.hosts.is_empty() {
+            vec![("localhost".to_string(), self.default_port)]
+        } else {
+            self.hosts
+        };
         Config {
-            host: self.host,
-            port: self.port,
+            hosts,
             database: self.database,
             user: self.user,
             password: self.password,
@@ -438,8 +515,9 @@ impl ConfigBuilder {
             statement_timeout: self.statement_timeout,
             _keepalive: self.keepalive,
             _keepalive_idle: self.keepalive_idle,
-            _target_session_attrs: self.target_session_attrs,
+            target_session_attrs: self.target_session_attrs,
             _extra_float_digits: self.extra_float_digits,
+            load_balance_hosts: self.load_balance_hosts,
             ssl_client_cert: self.ssl_client_cert,
             ssl_client_key: self.ssl_client_key,
             ssl_direct: self.ssl_direct,

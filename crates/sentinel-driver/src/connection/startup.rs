@@ -4,7 +4,7 @@ use bytes::BytesMut;
 use tracing::{debug, warn};
 
 use crate::auth;
-use crate::config::Config;
+use crate::config::{Config, TargetSessionAttrs};
 use crate::connection::stream::PgConnection;
 use crate::error::{Error, Result};
 use crate::protocol::backend::{BackendMessage, TransactionStatus};
@@ -149,4 +149,57 @@ pub(crate) async fn startup(conn: &mut PgConnection, config: &Config) -> Result<
         _server_params: server_params,
         transaction_status,
     })
+}
+
+/// Check whether the connected server matches the target session attributes.
+///
+/// Issues `SHOW transaction_read_only` after authentication and compares
+/// the result against the requested target.
+pub(crate) async fn check_session_attrs(
+    conn: &mut PgConnection,
+    target: TargetSessionAttrs,
+) -> Result<()> {
+    // Send simple query: SHOW transaction_read_only
+    let mut buf = BytesMut::new();
+    frontend::query(&mut buf, "SHOW transaction_read_only");
+    conn.send_raw(&buf).await?;
+
+    let mut read_only_value: Option<String> = None;
+
+    loop {
+        let msg = conn.recv().await?;
+        match msg {
+            BackendMessage::DataRow { columns } => {
+                if let Some(bytes) = columns.get(0) {
+                    read_only_value = Some(String::from_utf8_lossy(&bytes).into_owned());
+                }
+            }
+            BackendMessage::ReadyForQuery { .. } => break,
+            BackendMessage::ErrorResponse { fields } => {
+                return Err(Error::server(
+                    fields.severity,
+                    fields.code,
+                    fields.message,
+                    fields.detail,
+                    fields.hint,
+                    fields.position,
+                ));
+            }
+            _ => {}
+        }
+    }
+
+    let is_read_only = read_only_value.as_deref() == Some("on");
+
+    match target {
+        TargetSessionAttrs::Any => Ok(()),
+        TargetSessionAttrs::ReadWrite if !is_read_only => Ok(()),
+        TargetSessionAttrs::ReadOnly if is_read_only => Ok(()),
+        TargetSessionAttrs::ReadWrite => Err(Error::WrongSessionAttrs(
+            "server is read-only, expected read-write".to_string(),
+        )),
+        TargetSessionAttrs::ReadOnly => Err(Error::WrongSessionAttrs(
+            "server is read-write, expected read-only".to_string(),
+        )),
+    }
 }
