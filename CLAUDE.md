@@ -36,7 +36,7 @@ sentinel-driver/
 │   │       ├── pipeline/       # PG pipeline mode (auto-batch)
 │   │       ├── copy/           # COPY IN/OUT (binary + text)
 │   │       ├── notify/         # LISTEN/NOTIFY engine
-│   │       ├── types/          # PG type encode/decode (16 modules, 66 OIDs)
+│   │       ├── types/          # PG type encode/decode (24 modules, 78 OIDs)
 │   │       │   ├── oid.rs      # OID constants
 │   │       │   ├── traits.rs   # ToSql/FromSql traits
 │   │       │   ├── encode.rs   # ToSql implementations + array macros
@@ -51,7 +51,13 @@ sentinel-driver/
 │   │       │   ├── bit.rs      # BIT/VARBIT (PgBit)
 │   │       │   ├── hstore.rs   # HSTORE
 │   │       │   ├── xml.rs      # XML
-│   │       │   └── lsn.rs      # PG_LSN
+│   │       │   ├── lsn.rs      # PG_LSN
+│   │       │   ├── timetz.rs   # TIMETZ (time with timezone)
+│   │       │   ├── multirange.rs # Multirange types (PG 14+)
+│   │       │   ├── ltree.rs    # LTREE/LQUERY (extension)
+│   │       │   ├── cube.rs     # CUBE (extension)
+│   │       │   ├── json.rs     # Json<T> wrapper + serde_json::Value
+│   │       │   └── time_support.rs # time crate impls (feature-gated)
 │   │       ├── tls/            # rustls + client certs + direct TLS (PG 17+)
 │   │       ├── row.rs          # Row type (zero-copy column access)
 │   │       ├── stream.rs       # RowStream (async row-by-row iteration)
@@ -127,7 +133,13 @@ git config core.hooksPath .githooks   # Enable pre-commit hook
 - Connection pool (<0.5 μs checkout) with lifecycle callbacks + lazy connect
 - Advisory locks (RAII) — session and transaction scoped
 - Observability — tracing spans, slow query logging, query metrics callback
-- 66 OIDs — full PG type coverage including enums, composites, ranges, geometric, HSTORE
+- 78 OIDs — full PG type coverage including enums, composites, ranges, multiranges, geometric, HSTORE, LTREE, CUBE
+- Multi-host failover with load balancing + target_session_attrs (read-write/read-only routing)
+- Unix domain socket support
+- GenericClient trait — write code generic over Connection/Transaction/Pool
+- query_typed() — skip prepare round-trip for serverless environments
+- Json\<T\> wrapper — arbitrary Serialize/Deserialize to JSONB
+- `time` crate support (feature-gated alternative to chrono)
 - Criterion benchmarks for performance validation
 
 ## Conventions
@@ -149,7 +161,9 @@ Use `expect("reason")` with `#[allow(clippy::expect_used)]` for infallible opera
 - sha2, hmac, stringprep, base64, rand
 - chrono, uuid, thiserror, futures-core
 - tracing, lru, criterion (dev)
-- rust_decimal (optional, feature-gated)
+- rust_decimal (optional: `with-rust-decimal`)
+- serde, serde_json (optional: `with-serde-json`)
+- time (optional: `with-time`)
 
 No sqlx, no openssl, no libpq.
 
