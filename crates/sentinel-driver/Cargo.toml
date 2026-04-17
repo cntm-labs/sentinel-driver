@@ -55,12 +55,14 @@ sentinel-derive = { version = "0.1.0", path = "../sentinel-derive", optional = t
 rust_decimal = { version = "1", optional = true }
 serde = { version = "1", optional = true }
 serde_json = { version = "1", optional = true }
+time = { version = "0.3", optional = true, features = ["std"] }
 
 [features]
 default = ["derive"]
 derive = ["dep:sentinel-derive"]
 with-rust-decimal = ["dep:rust_decimal"]
 with-serde-json = ["dep:serde", "dep:serde_json"]
+with-time = ["dep:time"]
 
 [lints]
 workspace = true
@@ -68,6 +70,7 @@ workspace = true
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }
 criterion = { version = "0.5", features = ["html_reports"] }
+time = { version = "0.3", features = ["std", "macros"] }
 
 [[test]]
 name = "core_tests"

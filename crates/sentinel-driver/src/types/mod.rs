@@ -1,5 +1,6 @@
 pub mod bit;
 pub mod builtin;
+pub mod cube;
 pub mod decode;
 pub mod encode;
 pub mod geometric;
@@ -8,6 +9,7 @@ pub mod interval;
 #[cfg(feature = "with-serde-json")]
 pub mod json;
 pub mod lsn;
+pub mod ltree;
 pub mod money;
 pub mod multirange;
 pub mod network;
@@ -15,6 +17,8 @@ pub mod network;
 pub mod numeric;
 pub mod oid;
 pub mod range;
+#[cfg(feature = "with-time")]
+pub mod time_support;
 pub mod timetz;
 pub mod traits;
 pub mod xml;
