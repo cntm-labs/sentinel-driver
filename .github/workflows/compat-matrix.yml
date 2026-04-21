@@ -47,4 +47,7 @@ jobs:
       - name: Run integration tests
         env:
           DATABASE_URL: postgres://sentinel:sentinel_test@localhost:5432/sentinel_test
-        run: cargo test --workspace --test '*'
+        # --test-threads=1 serializes tests to avoid `pg_terminate_backend`
+        # from one test killing another's connection (pre-existing race in
+        # postgres::stream suite).
+        run: cargo test --workspace --test '*' -- --test-threads=1
