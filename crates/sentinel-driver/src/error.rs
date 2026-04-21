@@ -5,6 +5,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 /// All possible errors from sentinel-driver.
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum Error {
     /// I/O error from TCP/TLS stream.
     #[error("io error: {0}")]
@@ -81,6 +82,7 @@ pub enum Error {
 
 /// PostgreSQL server error details.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct ServerError {
     pub severity: String,
     pub code: String,
@@ -161,6 +163,7 @@ impl Error {
 
 /// Severity level from PostgreSQL ErrorResponse.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Severity {
     Error,
     Fatal,
