@@ -29,6 +29,7 @@ pub struct StatementCache {
 
 /// A cached prepared statement entry.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct CachedStatement {
     /// The server-side statement name.
     pub name: String,
@@ -38,6 +39,7 @@ pub struct CachedStatement {
 
 /// Cache hit/miss metrics.
 #[derive(Debug, Clone, Default)]
+#[non_exhaustive]
 pub struct CacheMetrics {
     pub tier1_hits: u64,
     pub tier2_hits: u64,

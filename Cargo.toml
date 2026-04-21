@@ -24,6 +24,11 @@ redundant_closure_for_method_calls = "deny"
 manual_let_else = "deny"
 cloned_instead_of_copied = "deny"
 implicit_clone = "deny"
+# SemVer hygiene — warn-level so new pub types surface without forcing
+# #[non_exhaustive] onto user-constructible data types (Point, PgInterval,
+# Config, etc.) where it would itself be a breaking change.
+exhaustive_enums = "warn"
+exhaustive_structs = "warn"
 # WARN — pedantic
 pedantic = { level = "warn", priority = -1 }
 module_name_repetitions = "allow"

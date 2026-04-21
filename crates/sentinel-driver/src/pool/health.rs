@@ -28,6 +28,7 @@ async fn try_check_alive(conn: &mut PgConnection) -> crate::error::Result<bool> 
 
 /// Strategy for checking connection health.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum HealthCheckStrategy {
     /// Flag-based check — no query, just check if the connection has
     /// been marked as broken by a previous I/O error. Fastest option (<0.5μs).
