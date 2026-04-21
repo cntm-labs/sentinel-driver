@@ -1,0 +1,50 @@
+name: compat-matrix
+
+on:
+  pull_request:
+    paths:
+      - 'crates/sentinel-derive/**'
+      - 'crates/sentinel-driver/**'
+      - '.github/workflows/compat-matrix.yml'
+  schedule:
+    - cron: '0 7 * * 1'   # weekly Monday 07:00 UTC
+
+jobs:
+  matrix:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        driver-ver: ["1.0.0", "1.1.0", "main"]
+        pg: ["13", "16", "17"]
+    services:
+      postgres:
+        image: postgres:${{ matrix.pg }}
+        env:
+          POSTGRES_PASSWORD: sentinel_test
+          POSTGRES_USER: sentinel
+          POSTGRES_DB: sentinel_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Pin driver version (${{ matrix.driver-ver }})
+        if: matrix.driver-ver != 'main'
+        run: |
+          cd crates/sentinel-derive
+          cargo update -p sentinel-driver --precise ${{ matrix.driver-ver }}
+      - name: Build sentinel-derive against pinned driver
+        run: cargo build -p sentinel-derive
+      - name: Run derive unit tests
+        run: cargo test -p sentinel-derive --lib
+      - name: Run integration tests
+        env:
+          DATABASE_URL: postgres://sentinel:sentinel_test@localhost:5432/sentinel_test
+        run: cargo test --workspace --test '*'
