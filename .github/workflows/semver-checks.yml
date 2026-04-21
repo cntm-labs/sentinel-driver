@@ -1,0 +1,27 @@
+name: semver-checks
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'crates/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+
+concurrency:
+  group: semver-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  semver:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install cargo-semver-checks
+        run: cargo install cargo-semver-checks --locked
+      - name: Check sentinel-driver SemVer
+        run: cargo semver-checks check-release -p sentinel-driver
+      - name: Check sentinel-derive SemVer
+        run: cargo semver-checks check-release -p sentinel-derive
