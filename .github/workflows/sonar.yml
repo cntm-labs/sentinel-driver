@@ -10,6 +10,8 @@ jobs:
   sonarqube:
     name: SonarQube Scan
     runs-on: self-hosted
+    env:
+      SCANNER_VERSION: 5.0.1.3006
     steps:
       - uses: actions/checkout@v4
         with:
@@ -19,12 +21,16 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-      - name: Install & Run Sonar Scanner
+      - name: Install Sonar Scanner (skip if already present on runner)
+        run: |
+          SCANNER_DIR="/opt/sonar-scanner-${SCANNER_VERSION}-linux"
+          if [ ! -x "$SCANNER_DIR/bin/sonar-scanner" ]; then
+            sudo apt-get update && sudo apt-get install -y unzip
+            curl -sSLo /tmp/sonar-scanner.zip "https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-${SCANNER_VERSION}-linux.zip"
+            sudo unzip -o /tmp/sonar-scanner.zip -d /opt
+          fi
+          sudo ln -sf "$SCANNER_DIR/bin/sonar-scanner" /usr/local/bin/sonar-scanner
+      - name: Run Sonar Scanner
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: |
-          sudo apt-get update && sudo apt-get install -y unzip
-          curl -sSLo /tmp/sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006-linux.zip
-          sudo unzip -o /tmp/sonar-scanner.zip -d /opt
-          sudo ln -sf /opt/sonar-scanner-5.0.1.3006-linux/bin/sonar-scanner /usr/local/bin/sonar-scanner
-          sonar-scanner -Dsonar.login=${{ secrets.SONAR_TOKEN }}
+        run: sonar-scanner -Dsonar.token="$SONAR_TOKEN"
