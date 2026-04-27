@@ -10,6 +10,8 @@ jobs:
   sonarqube:
     name: SonarQube Scan
     runs-on: [self-hosted, internal-runner]
+    env:
+      SCANNER_VERSION: 5.0.1.3006
     steps:
       - uses: actions/checkout@v4
         with:
@@ -24,7 +26,13 @@ jobs:
           SCANNER_DIR="/opt/sonar-scanner-${SCANNER_VERSION}-linux"
           if [ ! -x "$SCANNER_DIR/bin/sonar-scanner" ]; then
             sudo apt-get update && sudo apt-get install -y unzip
-            curl -sSLo /tmp/sonar-scanner.zip "https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-${SCANNER_VERSION}-linux.zip"
+            if ! curl -fsSLo /tmp/sonar-scanner.zip \
+                 "https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-${SCANNER_VERSION}-linux.zip"; then
+              echo "::error::Failed to download sonar-scanner ${SCANNER_VERSION}"
+              echo "First 500 bytes of partial download (if any):"
+              head -c 500 /tmp/sonar-scanner.zip 2>/dev/null || echo "(file empty or missing)"
+              exit 1
+            fi
             sudo unzip -o /tmp/sonar-scanner.zip -d /opt
           fi
           sudo ln -sf "$SCANNER_DIR/bin/sonar-scanner" /usr/local/bin/sonar-scanner
