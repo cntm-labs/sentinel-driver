@@ -9,9 +9,7 @@ on:
 jobs:
   sonarqube:
     name: SonarQube Scan
-    runs-on: self-hosted
-    env:
-      SCANNER_VERSION: 5.0.1.3006
+    runs-on: [self-hosted, internal-runner]
     steps:
       - uses: actions/checkout@v4
         with:
