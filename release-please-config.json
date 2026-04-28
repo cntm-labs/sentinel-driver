@@ -4,14 +4,12 @@
     "crates/sentinel-derive": {
       "release-type": "rust",
       "component": "sentinel-derive",
-      "bump-minor-pre-major": true,
-      "bump-patch-for-minor-pre-major": true
+      "release-as": "1.1.0"
     },
     "crates/sentinel-driver": {
       "release-type": "rust",
       "component": "sentinel-driver",
-      "bump-minor-pre-major": true,
-      "bump-patch-for-minor-pre-major": true,
+      "release-as": "1.1.0",
       "extra-files": [
         {
           "type": "toml",
