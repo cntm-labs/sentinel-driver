@@ -3,7 +3,29 @@ use std::fmt;
 /// Result type alias for sentinel-driver operations.
 pub type Result<T> = std::result::Result<T, Error>;
 
-/// All possible errors from sentinel-driver.
+/// All possible errors returned by `sentinel-driver`.
+///
+/// # Stability contract
+///
+/// This enum is `#[non_exhaustive]` as of v1.1.0. New variants may be
+/// added in any future minor release without a major version bump, in
+/// line with the additive-only stability policy in `GOVERNANCE.md`.
+///
+/// What this means for downstream code:
+///
+/// - `?` propagation and `From`/`Into` conversion are unaffected.
+/// - Manual exhaustive `match` arms must include a wildcard `_ =>` arm
+///   to keep compiling against future minor releases. This is the only
+///   migration required by the v1.0 → v1.1 transition.
+///
+/// ```ignore
+/// // OK — has a wildcard arm.
+/// match err {
+///     Error::ConnectionClosed => /* ... */,
+///     Error::TransactionCompleted => /* ... */,
+///     _ => /* ... */,
+/// }
+/// ```
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum Error {
