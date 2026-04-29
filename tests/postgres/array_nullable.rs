@@ -76,7 +76,10 @@ async fn test_int4_array_no_nulls_via_option() {
     let _ = require_pg!();
     let mut conn = connect().await;
 
-    let rows = conn.query("SELECT ARRAY[1, 2, 3]::int4[]", &[]).await.unwrap();
+    let rows = conn
+        .query("SELECT ARRAY[1, 2, 3]::int4[]", &[])
+        .await
+        .unwrap();
 
     let got: Vec<Option<i32>> = rows[0].get(0);
     assert_eq!(got, vec![Some(1), Some(2), Some(3)]);
@@ -88,10 +91,7 @@ async fn test_int4_array_all_null() {
     let mut conn = connect().await;
 
     let rows = conn
-        .query(
-            "SELECT ARRAY[NULL, NULL, NULL]::int4[]",
-            &[],
-        )
+        .query("SELECT ARRAY[NULL, NULL, NULL]::int4[]", &[])
         .await
         .unwrap();
 

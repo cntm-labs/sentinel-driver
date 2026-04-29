@@ -314,10 +314,7 @@ fn decode_array<T: FromSql>(buf: &[u8], expected_elem_oid: Oid) -> Result<Vec<T>
     })
 }
 
-fn decode_array_nullable<T: FromSql>(
-    buf: &[u8],
-    expected_elem_oid: Oid,
-) -> Result<Vec<Option<T>>> {
+fn decode_array_nullable<T: FromSql>(buf: &[u8], expected_elem_oid: Oid) -> Result<Vec<Option<T>>> {
     decode_array_inner(buf, expected_elem_oid, |opt| match opt {
         Some(bytes) => T::from_sql(bytes).map(Some),
         None => Ok(None),

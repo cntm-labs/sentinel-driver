@@ -515,7 +515,11 @@ fn test_decode_vec_option_string_with_null() {
     let got = <Vec<Option<String>> as FromSql>::from_sql(&buf).unwrap();
     assert_eq!(
         got,
-        vec![Some(String::from("hello")), None, Some(String::from("world"))]
+        vec![
+            Some(String::from("hello")),
+            None,
+            Some(String::from("world"))
+        ]
     );
 }
 
@@ -523,10 +527,7 @@ fn test_decode_vec_option_string_with_null() {
 fn test_decode_vec_option_bool_with_null() {
     let t = [1u8];
     let f = [0u8];
-    let buf = build_pg_array(
-        sentinel_driver::Oid::BOOL.0,
-        &[Some(&t), None, Some(&f)],
-    );
+    let buf = build_pg_array(sentinel_driver::Oid::BOOL.0, &[Some(&t), None, Some(&f)]);
     let got = <Vec<Option<bool>> as FromSql>::from_sql(&buf).unwrap();
     assert_eq!(got, vec![Some(true), None, Some(false)]);
 }
