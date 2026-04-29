@@ -3,13 +3,11 @@
   "packages": {
     "crates/sentinel-derive": {
       "release-type": "rust",
-      "component": "sentinel-derive",
-      "release-as": "1.1.0"
+      "component": "sentinel-derive"
     },
     "crates/sentinel-driver": {
       "release-type": "rust",
       "component": "sentinel-driver",
-      "release-as": "1.1.0",
       "extra-files": [
         {
           "type": "toml",
