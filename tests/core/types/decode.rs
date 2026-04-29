@@ -420,3 +420,139 @@ fn test_option_from_sql() {
     let result: Option<i32> = FromSql::from_sql_nullable(Some(&buf)).unwrap();
     assert_eq!(result, Some(42));
 }
+
+// ---------------------------------------------------------------------------
+// Nullable array decoding — `Vec<Option<T>>` (issue #33)
+// ---------------------------------------------------------------------------
+
+/// Build a one-dimensional PG binary-array body for the given element OID.
+///
+/// Each element is either `Some(bytes)` (a non-NULL element body) or
+/// `None` (SQL NULL, encoded as a per-element length of `-1`).
+fn build_pg_array(elem_oid: u32, elems: &[Option<&[u8]>]) -> Vec<u8> {
+    let mut out = Vec::new();
+    let has_null = elems.iter().any(Option::is_none) as i32;
+    out.extend_from_slice(&1i32.to_be_bytes()); // ndim
+    out.extend_from_slice(&has_null.to_be_bytes());
+    out.extend_from_slice(&elem_oid.to_be_bytes());
+    out.extend_from_slice(&(elems.len() as i32).to_be_bytes()); // dim_len
+    out.extend_from_slice(&1i32.to_be_bytes()); // dim_lbound
+    for e in elems {
+        match e {
+            Some(body) => {
+                out.extend_from_slice(&(body.len() as i32).to_be_bytes());
+                out.extend_from_slice(body);
+            }
+            None => {
+                out.extend_from_slice(&(-1i32).to_be_bytes());
+            }
+        }
+    }
+    out
+}
+
+#[test]
+fn test_decode_vec_option_i32_with_null() {
+    let one = 1i32.to_be_bytes();
+    let three = 3i32.to_be_bytes();
+    let buf = build_pg_array(
+        sentinel_driver::Oid::INT4.0,
+        &[Some(&one), None, Some(&three)],
+    );
+    let got = <Vec<Option<i32>> as FromSql>::from_sql(&buf).unwrap();
+    assert_eq!(got, vec![Some(1), None, Some(3)]);
+}
+
+#[test]
+fn test_decode_vec_option_i32_no_nulls() {
+    let a = 7i32.to_be_bytes();
+    let b = 8i32.to_be_bytes();
+    let buf = build_pg_array(sentinel_driver::Oid::INT4.0, &[Some(&a), Some(&b)]);
+    let got = <Vec<Option<i32>> as FromSql>::from_sql(&buf).unwrap();
+    assert_eq!(got, vec![Some(7), Some(8)]);
+}
+
+#[test]
+fn test_decode_vec_option_i32_all_null() {
+    let buf = build_pg_array(sentinel_driver::Oid::INT4.0, &[None, None, None]);
+    let got = <Vec<Option<i32>> as FromSql>::from_sql(&buf).unwrap();
+    assert_eq!(got, vec![None, None, None]);
+}
+
+#[test]
+fn test_decode_vec_option_empty() {
+    // ndim=0 — short-circuit path returns empty Vec without touching the
+    // header beyond the first 12 bytes.
+    let mut buf = Vec::new();
+    buf.extend_from_slice(&0i32.to_be_bytes()); // ndim = 0
+    buf.extend_from_slice(&0i32.to_be_bytes()); // has_null
+    buf.extend_from_slice(&sentinel_driver::Oid::INT4.0.to_be_bytes());
+    let got = <Vec<Option<i32>> as FromSql>::from_sql(&buf).unwrap();
+    assert!(got.is_empty());
+}
+
+#[test]
+fn test_decode_vec_i32_rejects_null_with_helpful_message() {
+    let one = 1i32.to_be_bytes();
+    let buf = build_pg_array(sentinel_driver::Oid::INT4.0, &[Some(&one), None]);
+    let err = <Vec<i32> as FromSql>::from_sql(&buf).unwrap_err();
+    let msg = format!("{err}");
+    assert!(msg.contains("NULL"), "expected NULL error, got: {msg}");
+    assert!(
+        msg.contains("Vec<Option<T>>"),
+        "expected suggestion to use Vec<Option<T>>, got: {msg}"
+    );
+}
+
+#[test]
+fn test_decode_vec_option_string_with_null() {
+    let hello = b"hello";
+    let world = b"world";
+    let buf = build_pg_array(
+        sentinel_driver::Oid::TEXT.0,
+        &[Some(hello), None, Some(world)],
+    );
+    let got = <Vec<Option<String>> as FromSql>::from_sql(&buf).unwrap();
+    assert_eq!(
+        got,
+        vec![Some(String::from("hello")), None, Some(String::from("world"))]
+    );
+}
+
+#[test]
+fn test_decode_vec_option_bool_with_null() {
+    let t = [1u8];
+    let f = [0u8];
+    let buf = build_pg_array(
+        sentinel_driver::Oid::BOOL.0,
+        &[Some(&t), None, Some(&f)],
+    );
+    let got = <Vec<Option<bool>> as FromSql>::from_sql(&buf).unwrap();
+    assert_eq!(got, vec![Some(true), None, Some(false)]);
+}
+
+#[test]
+fn test_decode_vec_option_bytea_with_null() {
+    let blob = &[0xde, 0xad, 0xbe, 0xef][..];
+    let buf = build_pg_array(sentinel_driver::Oid::BYTEA.0, &[Some(blob), None]);
+    let got = <Vec<Option<Vec<u8>>> as FromSql>::from_sql(&buf).unwrap();
+    assert_eq!(got, vec![Some(blob.to_vec()), None]);
+}
+
+#[test]
+fn test_decode_vec_option_oid_matches_array_oid() {
+    // Vec<Option<i32>> must advertise the same array OID as Vec<i32> so
+    // server-side type checks accept either at a parameter slot.
+    assert_eq!(
+        <Vec<Option<i32>> as FromSql>::oid(),
+        <Vec<i32> as FromSql>::oid()
+    );
+    assert_eq!(
+        <Vec<Option<String>> as FromSql>::oid(),
+        <Vec<String> as FromSql>::oid()
+    );
+    assert_eq!(
+        <Vec<Option<Vec<u8>>> as FromSql>::oid(),
+        <Vec<Vec<u8>> as FromSql>::oid()
+    );
+}

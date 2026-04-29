@@ -231,13 +231,28 @@ fn read_u32(buf: &[u8], offset: usize) -> u32 {
     ])
 }
 
-fn decode_array<T: FromSql>(buf: &[u8], expected_elem_oid: Oid) -> Result<Vec<T>> {
+/// Walk a one-dimensional PG array, calling `decode_elem` for each slot.
+///
+/// `decode_elem` receives `Some(&[u8])` for non-NULL element bodies and
+/// `None` for SQL NULL (signalled by a per-element length of `-1` in the
+/// PG binary array wire format). The closure decides what to do in each
+/// case — non-nullable callers raise an error on `None`; nullable callers
+/// map it to a sentinel value such as `Option::None`.
+fn decode_array_inner<T, F>(
+    buf: &[u8],
+    expected_elem_oid: Oid,
+    mut decode_elem: F,
+) -> Result<Vec<T>>
+where
+    F: FnMut(Option<&[u8]>) -> Result<T>,
+{
     if buf.len() < 12 {
         return Err(Error::Decode("array: header too short".into()));
     }
 
     let ndim = read_i32(buf, 0);
-    // has_null at buf[4..8] — we reject NULLs in element loop
+    // has_null at buf[4..8] is informational; the per-element length
+    // sentinel is the authoritative source for NULL.
     let elem_oid = read_u32(buf, 8);
 
     if ndim == 0 {
@@ -276,23 +291,49 @@ fn decode_array<T: FromSql>(buf: &[u8], expected_elem_oid: Oid) -> Result<Vec<T>
         offset += 4;
 
         if elem_len < 0 {
-            return Err(Error::Decode("array: NULL elements not supported".into()));
+            result.push(decode_elem(None)?);
+        } else {
+            let elem_len = elem_len as usize;
+            if offset + elem_len > buf.len() {
+                return Err(Error::Decode("array: element data truncated".into()));
+            }
+            result.push(decode_elem(Some(&buf[offset..offset + elem_len]))?);
+            offset += elem_len;
         }
-
-        let elem_len = elem_len as usize;
-        if offset + elem_len > buf.len() {
-            return Err(Error::Decode("array: element data truncated".into()));
-        }
-
-        let elem = T::from_sql(&buf[offset..offset + elem_len])?;
-        result.push(elem);
-        offset += elem_len;
     }
 
     Ok(result)
 }
 
-/// Macro to implement `FromSql` for `Vec<T>` for a specific element type.
+fn decode_array<T: FromSql>(buf: &[u8], expected_elem_oid: Oid) -> Result<Vec<T>> {
+    decode_array_inner(buf, expected_elem_oid, |opt| match opt {
+        Some(bytes) => T::from_sql(bytes),
+        None => Err(Error::Decode(
+            "array: NULL elements not supported (use Vec<Option<T>>)".into(),
+        )),
+    })
+}
+
+fn decode_array_nullable<T: FromSql>(
+    buf: &[u8],
+    expected_elem_oid: Oid,
+) -> Result<Vec<Option<T>>> {
+    decode_array_inner(buf, expected_elem_oid, |opt| match opt {
+        Some(bytes) => T::from_sql(bytes).map(Some),
+        None => Ok(None),
+    })
+}
+
+/// Implement `FromSql` for both `Vec<T>` and `Vec<Option<T>>` for a
+/// specific element type.
+///
+/// - `Vec<T>` errors on any SQL NULL element with a message that points
+///   the caller at `Vec<Option<T>>`.
+/// - `Vec<Option<T>>` maps SQL NULL to `Option::None`.
+///
+/// Both impls advertise the same array OID; PostgreSQL does not carry a
+/// distinct "nullable element" array type — nullability is per-element on
+/// the wire.
 macro_rules! impl_array_from_sql {
     ($elem_ty:ty, $array_oid:expr, $elem_oid:expr) => {
         impl FromSql for Vec<$elem_ty> {
@@ -302,6 +343,16 @@ macro_rules! impl_array_from_sql {
 
             fn from_sql(buf: &[u8]) -> Result<Self> {
                 decode_array::<$elem_ty>(buf, $elem_oid)
+            }
+        }
+
+        impl FromSql for Vec<Option<$elem_ty>> {
+            fn oid() -> Oid {
+                $array_oid
+            }
+
+            fn from_sql(buf: &[u8]) -> Result<Self> {
+                decode_array_nullable::<$elem_ty>(buf, $elem_oid)
             }
         }
     };
@@ -370,5 +421,15 @@ impl FromSql for Vec<Vec<u8>> {
 
     fn from_sql(buf: &[u8]) -> Result<Self> {
         decode_array::<Vec<u8>>(buf, Oid::BYTEA)
+    }
+}
+
+impl FromSql for Vec<Option<Vec<u8>>> {
+    fn oid() -> Oid {
+        Oid::BYTEA_ARRAY
+    }
+
+    fn from_sql(buf: &[u8]) -> Result<Self> {
+        decode_array_nullable::<Vec<u8>>(buf, Oid::BYTEA)
     }
 }
