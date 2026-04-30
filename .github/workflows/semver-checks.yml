@@ -23,5 +23,10 @@ jobs:
         run: cargo install cargo-semver-checks --locked
       - name: Check sentinel-driver SemVer
         run: cargo semver-checks check-release -p sentinel-driver
-      - name: Check sentinel-derive SemVer
-        run: cargo semver-checks check-release -p sentinel-derive
+      # `sentinel-derive` is a proc-macro crate. cargo-semver-checks only
+      # analyses library targets (it inspects the public Rust API surface
+      # via rustdoc JSON), so it cannot meaningfully check proc-macros and
+      # exits with `error: no crates with library targets selected`. The
+      # macro's stability contract — input syntax it accepts and the
+      # tokens it emits — is not visible to the tool. We rely on the
+      # crate's own UI/integration tests for that surface instead.
