@@ -1,3 +1,4 @@
+mod array_nullable;
 mod stream;
 
 use std::time::Duration;
