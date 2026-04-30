@@ -35,9 +35,13 @@ jobs:
         id: targets
         run: |
           set -euo pipefail
+          # crates.io's public API rejects requests without a User-Agent
+          # (HTTP 403). Be explicit so the step doesn't break in fresh
+          # CI environments where curl's default UA is missing.
+          UA="cntm-labs-sentinel-driver-publish (github.com/cntm-labs/sentinel-driver)"
           for crate in sentinel-derive sentinel-driver; do
             local_ver=$(grep '^version' "crates/${crate}/Cargo.toml" | head -1 | cut -d'"' -f2)
-            pub_ver=$(curl -fsSL "https://crates.io/api/v1/crates/${crate}" | jq -r '.crate.max_version')
+            pub_ver=$(curl -fsSL -H "User-Agent: ${UA}" "https://crates.io/api/v1/crates/${crate}" | jq -r '.crate.max_version')
             if [ "$local_ver" = "$pub_ver" ]; then
               echo "${crate}_publish=false" >> "$GITHUB_OUTPUT"
               echo "::notice::${crate} ${local_ver} already on crates.io — skipping publish step"
