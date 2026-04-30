@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.0.0](https://github.com/cntm-labs/sentinel-driver/compare/sentinel-driver-v1.0.0...sentinel-driver-v2.0.0) (2026-04-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* re-anchor Phase 0 SemVer hardening — document #[non_exhaustive] on Error ([#34](https://github.com/cntm-labs/sentinel-driver/issues/34))
+
+### Features
+
+* re-anchor Phase 0 SemVer hardening — document #[non_exhaustive] on Error ([#34](https://github.com/cntm-labs/sentinel-driver/issues/34)) ([3e2d6fd](https://github.com/cntm-labs/sentinel-driver/commit/3e2d6fd42d6b11640d65dd9a3f069621ae10e755))
+* **types:** support Vec&lt;Option&lt;T&gt;&gt; for arrays with NULL elements ([#35](https://github.com/cntm-labs/sentinel-driver/issues/35)) ([0313fc4](https://github.com/cntm-labs/sentinel-driver/commit/0313fc4f90f40e3c7170937344581425955aea92))
+
 ## [0.1.1](https://github.com/cntm-labs/sentinel-driver/compare/sentinel-driver-v0.1.0...sentinel-driver-v0.1.1) (2026-04-08)
 
 
