@@ -61,7 +61,8 @@ impl Connection {
             stmt_cache: StatementCache::new(),
             query_timeout,
             is_broken: false,
-            instrumentation: config.instrumentation
+            instrumentation: config
+                .instrumentation
                 .clone()
                 .unwrap_or_else(crate::instrumentation::noop),
         })

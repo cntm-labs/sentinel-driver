@@ -42,9 +42,8 @@ pub mod connection;
 pub mod copy;
 pub mod error;
 pub mod generic_client;
-pub mod notify;
 mod instrumentation;
-mod tracing_adapter;
+pub mod notify;
 pub mod pipeline;
 pub mod pool;
 pub mod portal;
@@ -53,6 +52,7 @@ pub mod row;
 pub mod statement;
 pub mod stream;
 pub mod tls;
+mod tracing_adapter;
 pub mod transaction;
 pub mod types;
 
@@ -67,17 +67,16 @@ pub use copy::binary::{BinaryCopyDecoder, BinaryCopyEncoder};
 pub use copy::text::{TextCopyDecoder, TextCopyEncoder};
 pub use error::{Error, Result};
 pub use generic_client::GenericClient;
-pub use notify::Notification;
 pub use instrumentation::{
-    AcquireOutcome, DisconnectReason, Event, Instrumentation, Outcome,
-    RollbackReason, StmtRef,
+    AcquireOutcome, DisconnectReason, Event, Instrumentation, Outcome, RollbackReason, StmtRef,
 };
-pub use tracing_adapter::TracingInstrumentation;
+pub use notify::Notification;
 pub use pool::{Pool, PoolMetrics, PooledConnection};
 pub use portal::Portal;
 pub use row::{CommandResult, Row, RowDescription, SimpleQueryMessage, SimpleQueryRow};
 pub use statement::Statement;
 pub use stream::RowStream;
+pub use tracing_adapter::TracingInstrumentation;
 pub use transaction::{IsolationLevel, TransactionConfig};
 pub use types::{FromSql, Oid, ToSql};
 

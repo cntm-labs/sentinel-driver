@@ -380,7 +380,10 @@ impl std::fmt::Debug for Config {
             .field("ssl_client_key", &self.ssl_client_key)
             .field("ssl_direct", &self.ssl_direct)
             .field("channel_binding", &self.channel_binding)
-            .field("instrumentation", &self.instrumentation.as_ref().map(|_| "..."))
+            .field(
+                "instrumentation",
+                &self.instrumentation.as_ref().map(|_| "..."),
+            )
             // _keepalive, _keepalive_idle, _extra_float_digits intentionally omitted —
             // placeholder fields, not yet wired to the connection path.
             .finish()

@@ -14,7 +14,8 @@ impl Connection {
         batch: PipelineBatch,
     ) -> Result<Vec<pipeline::QueryResult>> {
         let batch_len = batch.len();
-        self.instr().on_event(&crate::Event::PipelineStart { batch_len });
+        self.instr()
+            .on_event(&crate::Event::PipelineStart { batch_len });
         let started = std::time::Instant::now();
         let res = batch.execute(&mut self.conn).await;
         let total_duration = started.elapsed();

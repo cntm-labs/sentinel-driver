@@ -6,8 +6,8 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::Error;
 use crate::transaction::IsolationLevel;
+use crate::Error;
 
 /// A driver consumer's hook into every operation Sentinel performs.
 ///
@@ -32,12 +32,22 @@ pub(crate) fn noop() -> Arc<dyn Instrumentation> {
 #[non_exhaustive]
 pub enum Event<'a> {
     // Connection lifecycle
-    Connect       { host: &'a str, port: u16 },
-    Authenticated { user: &'a str },
-    Disconnect    { reason: DisconnectReason },
+    Connect {
+        host: &'a str,
+        port: u16,
+    },
+    Authenticated {
+        user: &'a str,
+    },
+    Disconnect {
+        reason: DisconnectReason,
+    },
 
     // Prepare
-    PrepareStart  { name: &'a str, sql: &'a str },
+    PrepareStart {
+        name: &'a str,
+        sql: &'a str,
+    },
     PrepareFinish {
         name: &'a str,
         param_oids: &'a [u32],
@@ -47,7 +57,10 @@ pub enum Event<'a> {
     },
 
     // Execute (covers query / query_one / query_opt / execute / query_typed*)
-    ExecuteStart  { stmt: StmtRef<'a>, param_count: usize },
+    ExecuteStart {
+        stmt: StmtRef<'a>,
+        param_count: usize,
+    },
     ExecuteFinish {
         stmt: StmtRef<'a>,
         rows: u64,
@@ -56,35 +69,80 @@ pub enum Event<'a> {
     },
 
     // Pipeline
-    PipelineStart { batch_len: usize },
-    PipelineFlush { batch_len: usize, total_duration: Duration },
+    PipelineStart {
+        batch_len: usize,
+    },
+    PipelineFlush {
+        batch_len: usize,
+        total_duration: Duration,
+    },
 
     // Transaction
-    TxBegin    { isolation: Option<IsolationLevel> },
-    TxCommit   { duration: Duration },
-    TxRollback { duration: Duration, reason: RollbackReason<'a> },
+    TxBegin {
+        isolation: Option<IsolationLevel>,
+    },
+    TxCommit {
+        duration: Duration,
+    },
+    TxRollback {
+        duration: Duration,
+        reason: RollbackReason<'a>,
+    },
 
     // Pool
-    PoolAcquireStart  { pending: usize },
-    PoolAcquireFinish { wait: Duration, outcome: AcquireOutcome },
+    PoolAcquireStart {
+        pending: usize,
+    },
+    PoolAcquireFinish {
+        wait: Duration,
+        outcome: AcquireOutcome,
+    },
     PoolRelease,
 
     // PG async messages
-    Notice       { severity: &'a str, code: &'a str, message: &'a str },
-    Notification { channel: &'a str, payload: &'a str, pid: i32 },
+    Notice {
+        severity: &'a str,
+        code: &'a str,
+        message: &'a str,
+    },
+    Notification {
+        channel: &'a str,
+        payload: &'a str,
+        pid: i32,
+    },
 
     // Sentinel-level (sntl crate emits these; driver itself never does)
-    QueryMacro      { macro_name: &'a str, query_id: &'a str, sql: &'a str },
-    ReducerBegin    { name: &'a str },
-    ReducerCommit   { name: &'a str, duration: Duration },
-    ReducerRollback { name: &'a str, error: &'a str },
-    MigrationApply  { version: &'a str, duration: Duration, checksum: &'a str },
-    MigrationDrift  { version: &'a str, recorded: &'a str, current: &'a str },
+    QueryMacro {
+        macro_name: &'a str,
+        query_id: &'a str,
+        sql: &'a str,
+    },
+    ReducerBegin {
+        name: &'a str,
+    },
+    ReducerCommit {
+        name: &'a str,
+        duration: Duration,
+    },
+    ReducerRollback {
+        name: &'a str,
+        error: &'a str,
+    },
+    MigrationApply {
+        version: &'a str,
+        duration: Duration,
+        checksum: &'a str,
+    },
+    MigrationDrift {
+        version: &'a str,
+        recorded: &'a str,
+        current: &'a str,
+    },
 }
 
 #[non_exhaustive]
 pub enum StmtRef<'a> {
-    Named  { name: &'a str },
+    Named { name: &'a str },
     Inline { sql: &'a str },
 }
 
@@ -104,15 +162,25 @@ impl<'a> StmtRef<'a> {
     pub fn op_hint(&self) -> &'static str {
         let s = self.sql_or_name();
         let first = s.split_ascii_whitespace().next().unwrap_or("");
-        if      first.eq_ignore_ascii_case("SELECT")   { "SELECT"   }
-        else if first.eq_ignore_ascii_case("INSERT")   { "INSERT"   }
-        else if first.eq_ignore_ascii_case("UPDATE")   { "UPDATE"   }
-        else if first.eq_ignore_ascii_case("DELETE")   { "DELETE"   }
-        else if first.eq_ignore_ascii_case("BEGIN")    { "BEGIN"    }
-        else if first.eq_ignore_ascii_case("COMMIT")   { "COMMIT"   }
-        else if first.eq_ignore_ascii_case("ROLLBACK") { "ROLLBACK" }
-        else if first.eq_ignore_ascii_case("WITH")     { "WITH"     }
-        else                                           { "OTHER"    }
+        if first.eq_ignore_ascii_case("SELECT") {
+            "SELECT"
+        } else if first.eq_ignore_ascii_case("INSERT") {
+            "INSERT"
+        } else if first.eq_ignore_ascii_case("UPDATE") {
+            "UPDATE"
+        } else if first.eq_ignore_ascii_case("DELETE") {
+            "DELETE"
+        } else if first.eq_ignore_ascii_case("BEGIN") {
+            "BEGIN"
+        } else if first.eq_ignore_ascii_case("COMMIT") {
+            "COMMIT"
+        } else if first.eq_ignore_ascii_case("ROLLBACK") {
+            "ROLLBACK"
+        } else if first.eq_ignore_ascii_case("WITH") {
+            "WITH"
+        } else {
+            "OTHER"
+        }
     }
 }
 
@@ -124,9 +192,27 @@ mod tests {
     fn op_hint_is_case_insensitive() {
         assert_eq!(StmtRef::Inline { sql: "SELECT 1" }.op_hint(), "SELECT");
         assert_eq!(StmtRef::Inline { sql: "select 1" }.op_hint(), "SELECT");
-        assert_eq!(StmtRef::Inline { sql: "Insert into t values (1)" }.op_hint(), "INSERT");
-        assert_eq!(StmtRef::Inline { sql: "   WITH cte AS (SELECT 1) SELECT * FROM cte" }.op_hint(), "WITH");
-        assert_eq!(StmtRef::Inline { sql: "CREATE TABLE x ()" }.op_hint(), "OTHER");
+        assert_eq!(
+            StmtRef::Inline {
+                sql: "Insert into t values (1)"
+            }
+            .op_hint(),
+            "INSERT"
+        );
+        assert_eq!(
+            StmtRef::Inline {
+                sql: "   WITH cte AS (SELECT 1) SELECT * FROM cte"
+            }
+            .op_hint(),
+            "WITH"
+        );
+        assert_eq!(
+            StmtRef::Inline {
+                sql: "CREATE TABLE x ()"
+            }
+            .op_hint(),
+            "OTHER"
+        );
         assert_eq!(StmtRef::Inline { sql: "" }.op_hint(), "OTHER");
     }
 }

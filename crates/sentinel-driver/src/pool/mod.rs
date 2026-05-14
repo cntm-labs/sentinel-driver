@@ -101,7 +101,10 @@ impl Pool {
             }),
         });
 
-        Self { shared, pool_instrumentation }
+        Self {
+            shared,
+            pool_instrumentation,
+        }
     }
 
     /// Create a pool that defers all connection establishment until the
@@ -127,10 +130,7 @@ impl Pool {
     /// from `Config::with_instrumentation`. Affects this `Pool` handle and
     /// any `Pool::clone()` made after this call; existing clones keep the
     /// previous instrumentation.
-    pub fn with_instrumentation(
-        mut self,
-        instr: Arc<dyn crate::Instrumentation>,
-    ) -> Self {
+    pub fn with_instrumentation(mut self, instr: Arc<dyn crate::Instrumentation>) -> Self {
         self.pool_instrumentation = instr;
         self
     }
@@ -145,16 +145,20 @@ impl Pool {
             let state = self.shared.state.lock().await;
             state.total_count.saturating_sub(state.idle.len())
         };
-        self.pool_instrumentation.on_event(&crate::Event::PoolAcquireStart { pending });
+        self.pool_instrumentation
+            .on_event(&crate::Event::PoolAcquireStart { pending });
         let started = std::time::Instant::now();
         let res = self.acquire_inner().await;
         let wait = started.elapsed();
         let outcome = match &res {
             Ok(_) => crate::AcquireOutcome::Ok,
-            Err(crate::Error::Pool(msg)) if msg.contains("timeout") => crate::AcquireOutcome::Timeout,
+            Err(crate::Error::Pool(msg)) if msg.contains("timeout") => {
+                crate::AcquireOutcome::Timeout
+            }
             Err(_) => crate::AcquireOutcome::PoolClosed,
         };
-        self.pool_instrumentation.on_event(&crate::Event::PoolAcquireFinish { wait, outcome });
+        self.pool_instrumentation
+            .on_event(&crate::Event::PoolAcquireFinish { wait, outcome });
         res
     }
 
@@ -356,7 +360,8 @@ impl Drop for PooledConnection {
     fn drop(&mut self) {
         if let Some(conn) = self.conn.take() {
             // Emit PoolRelease synchronously; the rest happens async.
-            self.pool_instrumentation.on_event(&crate::Event::PoolRelease);
+            self.pool_instrumentation
+                .on_event(&crate::Event::PoolRelease);
 
             let shared = Arc::clone(&self.shared);
 

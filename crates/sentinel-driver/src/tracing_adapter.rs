@@ -40,7 +40,12 @@ impl Instrumentation for TracingInstrumentation {
                 span.record("db.operation", stmt.op_hint());
                 span.record("sntl.param_count", *param_count);
             }
-            Event::ExecuteFinish { rows, duration, outcome, .. } => {
+            Event::ExecuteFinish {
+                rows,
+                duration,
+                outcome,
+                ..
+            } => {
                 span.record("db.rows_affected", *rows);
                 span.record("sntl.duration_us", duration.as_micros() as i64);
                 if let Outcome::Err(e) = outcome {
@@ -51,7 +56,11 @@ impl Instrumentation for TracingInstrumentation {
                     tracing::warn!(slow = true, "slow query");
                 }
             }
-            Event::PrepareFinish { cache_hit, duration, .. } => {
+            Event::PrepareFinish {
+                cache_hit,
+                duration,
+                ..
+            } => {
                 span.record("sntl.cache_hit", *cache_hit);
                 span.record("sntl.prepare_us", duration.as_micros() as i64);
             }
@@ -68,7 +77,10 @@ impl Instrumentation for TracingInstrumentation {
                     "tx rollback"
                 );
             }
-            Event::PipelineFlush { batch_len, total_duration } => {
+            Event::PipelineFlush {
+                batch_len,
+                total_duration,
+            } => {
                 span.record("sntl.pipeline_batch_len", *batch_len);
                 span.record("sntl.duration_us", total_duration.as_micros() as i64);
             }
@@ -79,7 +91,11 @@ impl Instrumentation for TracingInstrumentation {
                     "pool acquire"
                 );
             }
-            Event::Notice { severity, code, message } => {
+            Event::Notice {
+                severity,
+                code,
+                message,
+            } => {
                 tracing::warn!(severity = %severity, code = %code, "{}", message);
             }
             Event::Notification { channel, pid, .. } => {
