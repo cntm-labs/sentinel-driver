@@ -44,6 +44,7 @@ pub mod error;
 pub mod generic_client;
 pub mod notify;
 mod instrumentation;
+mod tracing_adapter;
 pub mod pipeline;
 pub mod pool;
 pub mod portal;
@@ -71,6 +72,7 @@ pub use instrumentation::{
     AcquireOutcome, DisconnectReason, Event, Instrumentation, Outcome,
     RollbackReason, StmtRef,
 };
+pub use tracing_adapter::TracingInstrumentation;
 pub use pool::{Pool, PoolMetrics, PooledConnection};
 pub use portal::Portal;
 pub use row::{CommandResult, Row, RowDescription, SimpleQueryMessage, SimpleQueryRow};

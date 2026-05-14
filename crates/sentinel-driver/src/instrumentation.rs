@@ -145,6 +145,7 @@ pub enum DisconnectReason {
     ServerKill,
 }
 
+#[derive(Debug)]
 #[non_exhaustive]
 pub enum RollbackReason<'a> {
     Explicit,
@@ -152,6 +153,7 @@ pub enum RollbackReason<'a> {
     Error(&'a Error),
 }
 
+#[derive(Debug)]
 #[non_exhaustive]
 pub enum AcquireOutcome {
     Ok,
