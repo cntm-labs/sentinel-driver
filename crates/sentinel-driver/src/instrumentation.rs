@@ -98,20 +98,36 @@ impl<'a> StmtRef<'a> {
     }
 
     /// First word of the SQL, uppercased. "OTHER" if no leading keyword found.
+    ///
+    /// Allocation-free: uses `eq_ignore_ascii_case` rather than uppercasing
+    /// the input, so it is safe to call on every `ExecuteStart` event.
     pub fn op_hint(&self) -> &'static str {
         let s = self.sql_or_name();
         let first = s.split_ascii_whitespace().next().unwrap_or("");
-        match first.to_ascii_uppercase().as_str() {
-            "SELECT" => "SELECT",
-            "INSERT" => "INSERT",
-            "UPDATE" => "UPDATE",
-            "DELETE" => "DELETE",
-            "BEGIN" => "BEGIN",
-            "COMMIT" => "COMMIT",
-            "ROLLBACK" => "ROLLBACK",
-            "WITH"   => "WITH",
-            _ => "OTHER",
-        }
+        if      first.eq_ignore_ascii_case("SELECT")   { "SELECT"   }
+        else if first.eq_ignore_ascii_case("INSERT")   { "INSERT"   }
+        else if first.eq_ignore_ascii_case("UPDATE")   { "UPDATE"   }
+        else if first.eq_ignore_ascii_case("DELETE")   { "DELETE"   }
+        else if first.eq_ignore_ascii_case("BEGIN")    { "BEGIN"    }
+        else if first.eq_ignore_ascii_case("COMMIT")   { "COMMIT"   }
+        else if first.eq_ignore_ascii_case("ROLLBACK") { "ROLLBACK" }
+        else if first.eq_ignore_ascii_case("WITH")     { "WITH"     }
+        else                                           { "OTHER"    }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn op_hint_is_case_insensitive() {
+        assert_eq!(StmtRef::Inline { sql: "SELECT 1" }.op_hint(), "SELECT");
+        assert_eq!(StmtRef::Inline { sql: "select 1" }.op_hint(), "SELECT");
+        assert_eq!(StmtRef::Inline { sql: "Insert into t values (1)" }.op_hint(), "INSERT");
+        assert_eq!(StmtRef::Inline { sql: "   WITH cte AS (SELECT 1) SELECT * FROM cte" }.op_hint(), "WITH");
+        assert_eq!(StmtRef::Inline { sql: "CREATE TABLE x ()" }.op_hint(), "OTHER");
+        assert_eq!(StmtRef::Inline { sql: "" }.op_hint(), "OTHER");
     }
 }
 
