@@ -24,7 +24,22 @@ impl Connection {
     /// Wait for the next LISTEN/NOTIFY notification.
     ///
     /// Blocks until a notification arrives on any subscribed channel.
+    ///
+    /// Emits a [`crate::Event::Notification`] event on success.
+    ///
+    /// Note: in-band NoticeResponse messages during regular queries are not
+    /// emitted as Notice events — the driver's query path doesn't yet handle
+    /// them gracefully. Startup-time notices log via tracing::debug only
+    /// (instrumentation isn't installed until after startup).
     pub async fn wait_for_notification(&mut self) -> Result<Notification> {
-        notify::wait_for_notification(&mut self.conn).await
+        let res = notify::wait_for_notification(&mut self.conn).await;
+        if let Ok(n) = &res {
+            self.instr().on_event(&crate::Event::Notification {
+                channel: &n.channel,
+                payload: &n.payload,
+                pid: n.process_id,
+            });
+        }
+        res
     }
 }
