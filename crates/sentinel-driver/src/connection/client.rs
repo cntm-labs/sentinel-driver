@@ -146,6 +146,32 @@ impl Connection {
         sql: &str,
         params: &[&(dyn ToSql + Sync)],
     ) -> Result<pipeline::QueryResult> {
+        self.instr().on_event(&crate::Event::ExecuteStart {
+            stmt: crate::StmtRef::Inline { sql },
+            param_count: params.len(),
+        });
+        let started = std::time::Instant::now();
+        let res = self.query_internal_inner(sql, params).await;
+        let duration = started.elapsed();
+        let (rows, outcome) = match &res {
+            Ok(pipeline::QueryResult::Rows(v)) => (v.len() as u64, crate::Outcome::Ok),
+            Ok(pipeline::QueryResult::Command(r)) => (r.rows_affected, crate::Outcome::Ok),
+            Err(e) => (0, crate::Outcome::Err(e)),
+        };
+        self.instr().on_event(&crate::Event::ExecuteFinish {
+            stmt: crate::StmtRef::Inline { sql },
+            rows,
+            duration,
+            outcome,
+        });
+        res
+    }
+
+    async fn query_internal_inner(
+        &mut self,
+        sql: &str,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<pipeline::QueryResult> {
         // Encode parameters
         let param_types: Vec<u32> = params.iter().map(|p| p.oid().0).collect();
         let mut encoded_params: Vec<Option<Vec<u8>>> = Vec::with_capacity(params.len());

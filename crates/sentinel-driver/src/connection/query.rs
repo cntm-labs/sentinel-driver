@@ -155,6 +155,36 @@ impl Connection {
     /// # }
     /// ```
     pub async fn simple_query(&mut self, sql: &str) -> Result<Vec<SimpleQueryMessage>> {
+        self.instr().on_event(&crate::Event::ExecuteStart {
+            stmt: crate::StmtRef::Inline { sql },
+            param_count: 0,
+        });
+        let started = std::time::Instant::now();
+        let res = self.simple_query_inner(sql).await;
+        let duration = started.elapsed();
+        let (rows, outcome) = match &res {
+            Ok(msgs) => {
+                let r = msgs
+                    .iter()
+                    .filter_map(|m| match m {
+                        SimpleQueryMessage::CommandComplete(n) => Some(*n),
+                        _ => None,
+                    })
+                    .sum::<u64>();
+                (r, crate::Outcome::Ok)
+            }
+            Err(e) => (0, crate::Outcome::Err(e)),
+        };
+        self.instr().on_event(&crate::Event::ExecuteFinish {
+            stmt: crate::StmtRef::Inline { sql },
+            rows,
+            duration,
+            outcome,
+        });
+        res
+    }
+
+    async fn simple_query_inner(&mut self, sql: &str) -> Result<Vec<SimpleQueryMessage>> {
         frontend::query(self.conn.write_buf(), sql);
         self.conn.send().await?;
 
@@ -267,6 +297,32 @@ impl Connection {
     }
 
     async fn query_typed_internal(
+        &mut self,
+        sql: &str,
+        params: &[(&(dyn ToSql + Sync), Oid)],
+    ) -> Result<pipeline::QueryResult> {
+        self.instr().on_event(&crate::Event::ExecuteStart {
+            stmt: crate::StmtRef::Inline { sql },
+            param_count: params.len(),
+        });
+        let started = std::time::Instant::now();
+        let res = self.query_typed_internal_inner(sql, params).await;
+        let duration = started.elapsed();
+        let (rows, outcome) = match &res {
+            Ok(pipeline::QueryResult::Rows(v)) => (v.len() as u64, crate::Outcome::Ok),
+            Ok(pipeline::QueryResult::Command(r)) => (r.rows_affected, crate::Outcome::Ok),
+            Err(e) => (0, crate::Outcome::Err(e)),
+        };
+        self.instr().on_event(&crate::Event::ExecuteFinish {
+            stmt: crate::StmtRef::Inline { sql },
+            rows,
+            duration,
+            outcome,
+        });
+        res
+    }
+
+    async fn query_typed_internal_inner(
         &mut self,
         sql: &str,
         params: &[(&(dyn ToSql + Sync), Oid)],
