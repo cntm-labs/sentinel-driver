@@ -36,7 +36,7 @@ impl Instrumentation for TracingInstrumentation {
             Event::ExecuteStart { stmt, param_count } => {
                 let sql = truncate(stmt.sql_or_name(), self.max_sql_len);
                 span.record("db.system", "postgresql");
-                span.record("db.statement", &tracing::field::display(&sql));
+                span.record("db.statement", tracing::field::display(&sql));
                 span.record("db.operation", stmt.op_hint());
                 span.record("sntl.param_count", *param_count);
             }

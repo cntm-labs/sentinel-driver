@@ -50,10 +50,10 @@ pub struct Config {
     pub(crate) application_name: Option<String>,
     pub(crate) connect_timeout: Duration,
     pub(crate) statement_timeout: Option<Duration>,
-    pub(crate) _keepalive: Option<Duration>,
-    pub(crate) _keepalive_idle: Option<Duration>,
+    pub(crate) keepalive: Option<Duration>,
+    pub(crate) keepalive_idle: Option<Duration>,
     pub(crate) target_session_attrs: TargetSessionAttrs,
-    pub(crate) _extra_float_digits: Option<i32>,
+    pub(crate) extra_float_digits: Option<i32>,
     pub(crate) load_balance_hosts: LoadBalanceHosts,
     /// Path to client certificate file for certificate authentication.
     pub(crate) ssl_client_cert: Option<std::path::PathBuf>,
@@ -374,6 +374,9 @@ impl std::fmt::Debug for Config {
             .field("application_name", &self.application_name)
             .field("connect_timeout", &self.connect_timeout)
             .field("statement_timeout", &self.statement_timeout)
+            .field("_keepalive", &self.keepalive)
+            .field("_keepalive_idle", &self.keepalive_idle)
+            .field("_extra_float_digits", &self.extra_float_digits)
             .field("target_session_attrs", &self.target_session_attrs)
             .field("load_balance_hosts", &self.load_balance_hosts)
             .field("ssl_client_cert", &self.ssl_client_cert)
@@ -384,8 +387,6 @@ impl std::fmt::Debug for Config {
                 "instrumentation",
                 &self.instrumentation.as_ref().map(|_| "..."),
             )
-            // _keepalive, _keepalive_idle, _extra_float_digits intentionally omitted —
-            // placeholder fields, not yet wired to the connection path.
             .finish()
     }
 }
@@ -552,10 +553,10 @@ impl ConfigBuilder {
             application_name: self.application_name,
             connect_timeout: self.connect_timeout,
             statement_timeout: self.statement_timeout,
-            _keepalive: self.keepalive,
-            _keepalive_idle: self.keepalive_idle,
+            keepalive: self.keepalive,
+            keepalive_idle: self.keepalive_idle,
             target_session_attrs: self.target_session_attrs,
-            _extra_float_digits: self.extra_float_digits,
+            extra_float_digits: self.extra_float_digits,
             load_balance_hosts: self.load_balance_hosts,
             ssl_client_cert: self.ssl_client_cert,
             ssl_client_key: self.ssl_client_key,

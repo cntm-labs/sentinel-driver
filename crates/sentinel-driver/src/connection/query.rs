@@ -168,7 +168,7 @@ impl Connection {
                     .iter()
                     .filter_map(|m| match m {
                         SimpleQueryMessage::CommandComplete(n) => Some(*n),
-                        _ => None,
+                        SimpleQueryMessage::Row(_) => None,
                     })
                     .sum::<u64>();
                 (r, crate::Outcome::Ok)
