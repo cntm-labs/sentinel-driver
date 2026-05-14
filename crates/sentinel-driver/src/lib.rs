@@ -67,7 +67,10 @@ pub use copy::text::{TextCopyDecoder, TextCopyEncoder};
 pub use error::{Error, Result};
 pub use generic_client::GenericClient;
 pub use notify::Notification;
-pub use instrumentation::{Event, Instrumentation};
+pub use instrumentation::{
+    AcquireOutcome, DisconnectReason, Event, Instrumentation, Outcome,
+    RollbackReason, StmtRef,
+};
 pub use pool::{Pool, PoolMetrics, PooledConnection};
 pub use portal::Portal;
 pub use row::{CommandResult, Row, RowDescription, SimpleQueryMessage, SimpleQueryRow};

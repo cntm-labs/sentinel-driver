@@ -4,6 +4,10 @@
 //! or `Connection::set_instrumentation`. Default is a no-op.
 
 use std::sync::Arc;
+use std::time::Duration;
+
+use crate::Error;
+use crate::transaction::IsolationLevel;
 
 /// A driver consumer's hook into every operation Sentinel performs.
 ///
@@ -25,7 +29,116 @@ pub(crate) fn noop() -> Arc<dyn Instrumentation> {
     Arc::new(NoOpInstrumentation)
 }
 
-// Event taxonomy lands in Task 2.
+#[non_exhaustive]
 pub enum Event<'a> {
-    _Phantom(std::marker::PhantomData<&'a ()>),
+    // Connection lifecycle
+    Connect       { host: &'a str, port: u16 },
+    Authenticated { user: &'a str },
+    Disconnect    { reason: DisconnectReason },
+
+    // Prepare
+    PrepareStart  { name: &'a str, sql: &'a str },
+    PrepareFinish {
+        name: &'a str,
+        param_oids: &'a [u32],
+        col_count: u16,
+        duration: Duration,
+        cache_hit: bool,
+    },
+
+    // Execute (covers query / query_one / query_opt / execute / query_typed*)
+    ExecuteStart  { stmt: StmtRef<'a>, param_count: usize },
+    ExecuteFinish {
+        stmt: StmtRef<'a>,
+        rows: u64,
+        duration: Duration,
+        outcome: Outcome<'a>,
+    },
+
+    // Pipeline
+    PipelineStart { batch_len: usize },
+    PipelineFlush { batch_len: usize, total_duration: Duration },
+
+    // Transaction
+    TxBegin    { isolation: Option<IsolationLevel> },
+    TxCommit   { duration: Duration },
+    TxRollback { duration: Duration, reason: RollbackReason<'a> },
+
+    // Pool
+    PoolAcquireStart  { pending: usize },
+    PoolAcquireFinish { wait: Duration, outcome: AcquireOutcome },
+    PoolRelease,
+
+    // PG async messages
+    Notice       { severity: &'a str, code: &'a str, message: &'a str },
+    Notification { channel: &'a str, payload: &'a str, pid: i32 },
+
+    // Sentinel-level (sntl crate emits these; driver itself never does)
+    QueryMacro      { macro_name: &'a str, query_id: &'a str, sql: &'a str },
+    ReducerBegin    { name: &'a str },
+    ReducerCommit   { name: &'a str, duration: Duration },
+    ReducerRollback { name: &'a str, error: &'a str },
+    MigrationApply  { version: &'a str, duration: Duration, checksum: &'a str },
+    MigrationDrift  { version: &'a str, recorded: &'a str, current: &'a str },
+}
+
+#[non_exhaustive]
+pub enum StmtRef<'a> {
+    Named  { name: &'a str },
+    Inline { sql: &'a str },
+}
+
+impl<'a> StmtRef<'a> {
+    /// SQL text if available (Inline), else the prepared name (Named).
+    pub fn sql_or_name(&self) -> &'a str {
+        match self {
+            StmtRef::Named { name } => name,
+            StmtRef::Inline { sql } => sql,
+        }
+    }
+
+    /// First word of the SQL, uppercased. "OTHER" if no leading keyword found.
+    pub fn op_hint(&self) -> &'static str {
+        let s = self.sql_or_name();
+        let first = s.split_ascii_whitespace().next().unwrap_or("");
+        match first.to_ascii_uppercase().as_str() {
+            "SELECT" => "SELECT",
+            "INSERT" => "INSERT",
+            "UPDATE" => "UPDATE",
+            "DELETE" => "DELETE",
+            "BEGIN" => "BEGIN",
+            "COMMIT" => "COMMIT",
+            "ROLLBACK" => "ROLLBACK",
+            "WITH"   => "WITH",
+            _ => "OTHER",
+        }
+    }
+}
+
+#[non_exhaustive]
+pub enum Outcome<'a> {
+    Ok,
+    Err(&'a Error),
+}
+
+#[non_exhaustive]
+pub enum DisconnectReason {
+    Graceful,
+    BrokenPipe,
+    Timeout,
+    ServerKill,
+}
+
+#[non_exhaustive]
+pub enum RollbackReason<'a> {
+    Explicit,
+    Drop,
+    Error(&'a Error),
+}
+
+#[non_exhaustive]
+pub enum AcquireOutcome {
+    Ok,
+    Timeout,
+    PoolClosed,
 }
