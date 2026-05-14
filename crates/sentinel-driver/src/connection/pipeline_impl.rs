@@ -13,6 +13,15 @@ impl Connection {
         &mut self,
         batch: PipelineBatch,
     ) -> Result<Vec<pipeline::QueryResult>> {
-        batch.execute(&mut self.conn).await
+        let batch_len = batch.len();
+        self.instr().on_event(&crate::Event::PipelineStart { batch_len });
+        let started = std::time::Instant::now();
+        let res = batch.execute(&mut self.conn).await;
+        let total_duration = started.elapsed();
+        self.instr().on_event(&crate::Event::PipelineFlush {
+            batch_len,
+            total_duration,
+        });
+        res
     }
 }
