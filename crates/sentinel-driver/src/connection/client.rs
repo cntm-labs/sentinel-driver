@@ -61,6 +61,7 @@ impl Connection {
             stmt_cache: StatementCache::new(),
             query_timeout,
             is_broken: false,
+            instrumentation: crate::instrumentation::noop(),
         })
     }
 
@@ -175,5 +176,23 @@ impl Connection {
                 return Ok(());
             }
         }
+    }
+
+    /// Install an `Instrumentation` impl on this connection.
+    /// Replaces any previous installation.
+    pub fn set_instrumentation(&mut self, instr: std::sync::Arc<dyn crate::Instrumentation>) {
+        self.instrumentation = instr;
+    }
+
+    /// Public accessor used by downstream macro helpers (e.g. sntl's
+    /// `__priv::emit_query_macro`). Returns the shared `Arc` so callers can
+    /// emit Sentinel-level events through the same trait.
+    pub fn instrumentation(&self) -> &std::sync::Arc<dyn crate::Instrumentation> {
+        &self.instrumentation
+    }
+
+    /// Crate-internal shorthand for wire sites.
+    pub(crate) fn instr(&self) -> &dyn crate::Instrumentation {
+        &*self.instrumentation
     }
 }

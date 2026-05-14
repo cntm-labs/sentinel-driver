@@ -45,4 +45,5 @@ pub struct Connection {
     pub(crate) stmt_cache: StatementCache,
     pub(crate) query_timeout: Option<Duration>,
     pub(crate) is_broken: bool,
+    pub(crate) instrumentation: std::sync::Arc<dyn crate::Instrumentation>,
 }
