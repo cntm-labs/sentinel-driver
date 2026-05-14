@@ -40,7 +40,7 @@ pub enum SslMode {
 ///     .password("secret")
 ///     .build();
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Config {
     pub(crate) hosts: Vec<(String, u16)>,
     pub(crate) database: String,
@@ -63,6 +63,7 @@ pub struct Config {
     pub(crate) ssl_direct: bool,
     /// Enable SCRAM-SHA-256 channel binding (SCRAM-PLUS) when TLS is active.
     pub(crate) channel_binding: ChannelBinding,
+    pub(crate) instrumentation: Option<std::sync::Arc<dyn crate::Instrumentation>>,
 }
 
 /// Channel binding preference for SCRAM authentication.
@@ -349,6 +350,38 @@ impl Config {
     pub fn channel_binding(&self) -> ChannelBinding {
         self.channel_binding
     }
+
+    /// Install an `Instrumentation` impl. Inherited by every `Connection` and
+    /// `Pool` built from this `Config`.
+    pub fn with_instrumentation(
+        mut self,
+        instr: std::sync::Arc<dyn crate::Instrumentation>,
+    ) -> Self {
+        self.instrumentation = Some(instr);
+        self
+    }
+}
+
+impl std::fmt::Debug for Config {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Config")
+            .field("hosts", &self.hosts)
+            .field("database", &self.database)
+            .field("user", &self.user)
+            .field("password", &self.password.as_ref().map(|_| "...".to_string()))
+            .field("ssl_mode", &self.ssl_mode)
+            .field("application_name", &self.application_name)
+            .field("connect_timeout", &self.connect_timeout)
+            .field("statement_timeout", &self.statement_timeout)
+            .field("target_session_attrs", &self.target_session_attrs)
+            .field("load_balance_hosts", &self.load_balance_hosts)
+            .field("ssl_client_cert", &self.ssl_client_cert)
+            .field("ssl_client_key", &self.ssl_client_key)
+            .field("ssl_direct", &self.ssl_direct)
+            .field("channel_binding", &self.channel_binding)
+            .field("instrumentation", &self.instrumentation.as_ref().map(|_| "..."))
+            .finish()
+    }
 }
 
 /// Builder for [`Config`].
@@ -522,6 +555,7 @@ impl ConfigBuilder {
             ssl_client_key: self.ssl_client_key,
             ssl_direct: self.ssl_direct,
             channel_binding: self.channel_binding,
+            instrumentation: None,
         }
     }
 }
