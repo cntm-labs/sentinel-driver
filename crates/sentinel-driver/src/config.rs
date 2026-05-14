@@ -63,6 +63,7 @@ pub struct Config {
     pub(crate) ssl_direct: bool,
     /// Enable SCRAM-SHA-256 channel binding (SCRAM-PLUS) when TLS is active.
     pub(crate) channel_binding: ChannelBinding,
+    /// Pluggable instrumentation hook; `None` uses a no-op default.
     pub(crate) instrumentation: Option<std::sync::Arc<dyn crate::Instrumentation>>,
 }
 
@@ -368,7 +369,7 @@ impl std::fmt::Debug for Config {
             .field("hosts", &self.hosts)
             .field("database", &self.database)
             .field("user", &self.user)
-            .field("password", &self.password.as_ref().map(|_| "...".to_string()))
+            .field("password", &self.password.as_ref().map(|_| "..."))
             .field("ssl_mode", &self.ssl_mode)
             .field("application_name", &self.application_name)
             .field("connect_timeout", &self.connect_timeout)
@@ -380,6 +381,8 @@ impl std::fmt::Debug for Config {
             .field("ssl_direct", &self.ssl_direct)
             .field("channel_binding", &self.channel_binding)
             .field("instrumentation", &self.instrumentation.as_ref().map(|_| "..."))
+            // _keepalive, _keepalive_idle, _extra_float_digits intentionally omitted —
+            // placeholder fields, not yet wired to the connection path.
             .finish()
     }
 }
