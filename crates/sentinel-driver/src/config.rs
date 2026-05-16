@@ -598,3 +598,62 @@ fn hex_digit(b: u8) -> Result<u8> {
         _ => Err(Error::Config(format!("invalid hex digit: {}", b as char))),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn config_builder_build_populates_all_fields() {
+        let cfg = ConfigBuilder::new()
+            .host("localhost".to_string())
+            .port(5432)
+            .database("test".to_string())
+            .user("postgres".to_string())
+            .password("secret".to_string())
+            .application_name("test_app".to_string())
+            .connect_timeout(std::time::Duration::from_secs(10))
+            .channel_binding(ChannelBinding::Prefer)
+            .build();
+        assert_eq!(cfg.user, "postgres");
+        assert_eq!(cfg.database, "test");
+        assert_eq!(cfg.application_name.as_deref(), Some("test_app"));
+        assert_eq!(cfg.channel_binding, ChannelBinding::Prefer);
+        // keepalive defaults to Some(60s) in ConfigBuilder::new()
+        assert_eq!(cfg.keepalive, Some(std::time::Duration::from_secs(60)));
+        assert!(cfg.keepalive_idle.is_none());
+        // extra_float_digits defaults to Some(3) in ConfigBuilder::new()
+        assert_eq!(cfg.extra_float_digits, Some(3));
+        assert!(cfg.instrumentation.is_none());
+    }
+
+    #[test]
+    fn channel_binding_accessor() {
+        let cfg = ConfigBuilder::new()
+            .channel_binding(ChannelBinding::Require)
+            .build();
+        assert_eq!(cfg.channel_binding(), ChannelBinding::Require);
+    }
+
+    #[test]
+    fn with_instrumentation_sets_field() {
+        struct NoOp;
+        impl crate::Instrumentation for NoOp {
+            fn on_event(&self, _: &crate::Event<'_>) {}
+        }
+        let cfg = ConfigBuilder::new()
+            .build()
+            .with_instrumentation(std::sync::Arc::new(NoOp));
+        assert!(cfg.instrumentation.is_some());
+    }
+
+    #[test]
+    fn debug_redacts_password() {
+        let cfg = ConfigBuilder::new()
+            .password("super_secret".to_string())
+            .build();
+        let s = format!("{cfg:?}");
+        assert!(!s.contains("super_secret"));
+        assert!(s.contains("password"));
+    }
+}
