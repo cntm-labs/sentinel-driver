@@ -155,7 +155,10 @@ impl Pool {
             Err(crate::Error::Pool(msg)) if msg.contains("timeout") => {
                 crate::AcquireOutcome::Timeout
             }
-            Err(_) => crate::AcquireOutcome::PoolClosed,
+            Err(crate::Error::Pool(msg)) if msg.contains("closed") => {
+                crate::AcquireOutcome::PoolClosed
+            }
+            Err(_) => crate::AcquireOutcome::Error,
         };
         self.pool_instrumentation
             .on_event(&crate::Event::PoolAcquireFinish { wait, outcome });

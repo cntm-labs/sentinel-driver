@@ -245,4 +245,7 @@ pub enum AcquireOutcome {
     Ok,
     Timeout,
     PoolClosed,
+    /// Any other failure: TLS handshake, DNS, auth, or connection setup.
+    /// Use the error message in adjacent log context to disambiguate.
+    Error,
 }
