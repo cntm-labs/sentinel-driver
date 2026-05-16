@@ -1,5 +1,16 @@
 # Changelog
 
+## [3.0.0](https://github.com/cntm-labs/sentinel-driver/compare/sentinel-driver-v2.0.0...sentinel-driver-v3.0.0) (2026-05-16)
+
+
+### ⚠ BREAKING CHANGES
+
+* **observability:** removed dead types ObservabilityConfig, QueryMetrics, QueryMetricsCallback, log_slow_query, query_span, pub mod observability. None of these ever fired at runtime; replaced by the Instrumentation trait + TracingInstrumentation adapter.
+
+### Features
+
+* **observability:** Instrumentation trait + TracingInstrumentation adapter (v3.0.0) ([#40](https://github.com/cntm-labs/sentinel-driver/issues/40)) ([9cd62c3](https://github.com/cntm-labs/sentinel-driver/commit/9cd62c3646065e96251c46980d1b0c47e8444d9d))
+
 ## [2.0.0](https://github.com/cntm-labs/sentinel-driver/compare/sentinel-driver-v1.0.0...sentinel-driver-v2.0.0) (2026-04-30)
 
 
