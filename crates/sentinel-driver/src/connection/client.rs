@@ -61,6 +61,10 @@ impl Connection {
             stmt_cache: StatementCache::new(),
             query_timeout,
             is_broken: false,
+            instrumentation: config
+                .instrumentation
+                .clone()
+                .unwrap_or_else(crate::instrumentation::noop),
         })
     }
 
@@ -143,6 +147,32 @@ impl Connection {
         sql: &str,
         params: &[&(dyn ToSql + Sync)],
     ) -> Result<pipeline::QueryResult> {
+        self.instr().on_event(&crate::Event::ExecuteStart {
+            stmt: crate::StmtRef::Inline { sql },
+            param_count: params.len(),
+        });
+        let started = std::time::Instant::now();
+        let res = self.query_internal_inner(sql, params).await;
+        let duration = started.elapsed();
+        let (rows, outcome) = match &res {
+            Ok(pipeline::QueryResult::Rows(v)) => (v.len() as u64, crate::Outcome::Ok),
+            Ok(pipeline::QueryResult::Command(r)) => (r.rows_affected, crate::Outcome::Ok),
+            Err(e) => (0, crate::Outcome::Err(e)),
+        };
+        self.instr().on_event(&crate::Event::ExecuteFinish {
+            stmt: crate::StmtRef::Inline { sql },
+            rows,
+            duration,
+            outcome,
+        });
+        res
+    }
+
+    async fn query_internal_inner(
+        &mut self,
+        sql: &str,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<pipeline::QueryResult> {
         // Encode parameters
         let param_types: Vec<u32> = params.iter().map(|p| p.oid().0).collect();
         let mut encoded_params: Vec<Option<Vec<u8>>> = Vec::with_capacity(params.len());
@@ -175,5 +205,23 @@ impl Connection {
                 return Ok(());
             }
         }
+    }
+
+    /// Install an `Instrumentation` impl on this connection.
+    /// Replaces any previous installation.
+    pub fn set_instrumentation(&mut self, instr: std::sync::Arc<dyn crate::Instrumentation>) {
+        self.instrumentation = instr;
+    }
+
+    /// Public accessor used by downstream macro helpers (e.g. sntl's
+    /// `__priv::emit_query_macro`). Returns the shared `Arc` so callers can
+    /// emit Sentinel-level events through the same trait.
+    pub fn instrumentation(&self) -> &std::sync::Arc<dyn crate::Instrumentation> {
+        &self.instrumentation
+    }
+
+    /// Crate-internal shorthand for wire sites.
+    pub(crate) fn instr(&self) -> &dyn crate::Instrumentation {
+        &*self.instrumentation
     }
 }

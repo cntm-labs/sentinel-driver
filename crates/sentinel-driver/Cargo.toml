@@ -1,6 +1,6 @@
 [package]
 name = "sentinel-driver"
-version = "2.0.0"
+version = "3.0.0"
 edition = "2021"
 description = "High-performance PostgreSQL wire protocol driver for Rust"
 license = "MIT OR Apache-2.0"
@@ -72,6 +72,7 @@ tokio = { version = "1", features = ["full"] }
 criterion = { version = "0.5", features = ["html_reports"] }
 time = { version = "0.3", features = ["std", "macros"] }
 trybuild = "1"
+tracing-test = { version = "0.2", features = ["no-env-filter"] }
 
 [[test]]
 name = "core_tests"

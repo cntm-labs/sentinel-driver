@@ -40,7 +40,7 @@ pub enum SslMode {
 ///     .password("secret")
 ///     .build();
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Config {
     pub(crate) hosts: Vec<(String, u16)>,
     pub(crate) database: String,
@@ -50,10 +50,10 @@ pub struct Config {
     pub(crate) application_name: Option<String>,
     pub(crate) connect_timeout: Duration,
     pub(crate) statement_timeout: Option<Duration>,
-    pub(crate) _keepalive: Option<Duration>,
-    pub(crate) _keepalive_idle: Option<Duration>,
+    pub(crate) keepalive: Option<Duration>,
+    pub(crate) keepalive_idle: Option<Duration>,
     pub(crate) target_session_attrs: TargetSessionAttrs,
-    pub(crate) _extra_float_digits: Option<i32>,
+    pub(crate) extra_float_digits: Option<i32>,
     pub(crate) load_balance_hosts: LoadBalanceHosts,
     /// Path to client certificate file for certificate authentication.
     pub(crate) ssl_client_cert: Option<std::path::PathBuf>,
@@ -63,6 +63,8 @@ pub struct Config {
     pub(crate) ssl_direct: bool,
     /// Enable SCRAM-SHA-256 channel binding (SCRAM-PLUS) when TLS is active.
     pub(crate) channel_binding: ChannelBinding,
+    /// Pluggable instrumentation hook; `None` uses a no-op default.
+    pub(crate) instrumentation: Option<std::sync::Arc<dyn crate::Instrumentation>>,
 }
 
 /// Channel binding preference for SCRAM authentication.
@@ -349,6 +351,44 @@ impl Config {
     pub fn channel_binding(&self) -> ChannelBinding {
         self.channel_binding
     }
+
+    /// Install an `Instrumentation` impl. Inherited by every `Connection` and
+    /// `Pool` built from this `Config`.
+    pub fn with_instrumentation(
+        mut self,
+        instr: std::sync::Arc<dyn crate::Instrumentation>,
+    ) -> Self {
+        self.instrumentation = Some(instr);
+        self
+    }
+}
+
+impl std::fmt::Debug for Config {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Config")
+            .field("hosts", &self.hosts)
+            .field("database", &self.database)
+            .field("user", &self.user)
+            .field("password", &self.password.as_ref().map(|_| "..."))
+            .field("ssl_mode", &self.ssl_mode)
+            .field("application_name", &self.application_name)
+            .field("connect_timeout", &self.connect_timeout)
+            .field("statement_timeout", &self.statement_timeout)
+            .field("_keepalive", &self.keepalive)
+            .field("_keepalive_idle", &self.keepalive_idle)
+            .field("_extra_float_digits", &self.extra_float_digits)
+            .field("target_session_attrs", &self.target_session_attrs)
+            .field("load_balance_hosts", &self.load_balance_hosts)
+            .field("ssl_client_cert", &self.ssl_client_cert)
+            .field("ssl_client_key", &self.ssl_client_key)
+            .field("ssl_direct", &self.ssl_direct)
+            .field("channel_binding", &self.channel_binding)
+            .field(
+                "instrumentation",
+                &self.instrumentation.as_ref().map(|_| "..."),
+            )
+            .finish()
+    }
 }
 
 /// Builder for [`Config`].
@@ -513,15 +553,16 @@ impl ConfigBuilder {
             application_name: self.application_name,
             connect_timeout: self.connect_timeout,
             statement_timeout: self.statement_timeout,
-            _keepalive: self.keepalive,
-            _keepalive_idle: self.keepalive_idle,
+            keepalive: self.keepalive,
+            keepalive_idle: self.keepalive_idle,
             target_session_attrs: self.target_session_attrs,
-            _extra_float_digits: self.extra_float_digits,
+            extra_float_digits: self.extra_float_digits,
             load_balance_hosts: self.load_balance_hosts,
             ssl_client_cert: self.ssl_client_cert,
             ssl_client_key: self.ssl_client_key,
             ssl_direct: self.ssl_direct,
             channel_binding: self.channel_binding,
+            instrumentation: None,
         }
     }
 }
@@ -555,5 +596,64 @@ fn hex_digit(b: u8) -> Result<u8> {
         b'a'..=b'f' => Ok(b - b'a' + 10),
         b'A'..=b'F' => Ok(b - b'A' + 10),
         _ => Err(Error::Config(format!("invalid hex digit: {}", b as char))),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn config_builder_build_populates_all_fields() {
+        let cfg = ConfigBuilder::new()
+            .host("localhost".to_string())
+            .port(5432)
+            .database("test".to_string())
+            .user("postgres".to_string())
+            .password("secret".to_string())
+            .application_name("test_app".to_string())
+            .connect_timeout(std::time::Duration::from_secs(10))
+            .channel_binding(ChannelBinding::Prefer)
+            .build();
+        assert_eq!(cfg.user, "postgres");
+        assert_eq!(cfg.database, "test");
+        assert_eq!(cfg.application_name.as_deref(), Some("test_app"));
+        assert_eq!(cfg.channel_binding, ChannelBinding::Prefer);
+        // keepalive defaults to Some(60s) in ConfigBuilder::new()
+        assert_eq!(cfg.keepalive, Some(std::time::Duration::from_secs(60)));
+        assert!(cfg.keepalive_idle.is_none());
+        // extra_float_digits defaults to Some(3) in ConfigBuilder::new()
+        assert_eq!(cfg.extra_float_digits, Some(3));
+        assert!(cfg.instrumentation.is_none());
+    }
+
+    #[test]
+    fn channel_binding_accessor() {
+        let cfg = ConfigBuilder::new()
+            .channel_binding(ChannelBinding::Require)
+            .build();
+        assert_eq!(cfg.channel_binding(), ChannelBinding::Require);
+    }
+
+    #[test]
+    fn with_instrumentation_sets_field() {
+        struct NoOp;
+        impl crate::Instrumentation for NoOp {
+            fn on_event(&self, _: &crate::Event<'_>) {}
+        }
+        let cfg = ConfigBuilder::new()
+            .build()
+            .with_instrumentation(std::sync::Arc::new(NoOp));
+        assert!(cfg.instrumentation.is_some());
+    }
+
+    #[test]
+    fn debug_redacts_password() {
+        let cfg = ConfigBuilder::new()
+            .password("super_secret".to_string())
+            .build();
+        let s = format!("{cfg:?}");
+        assert!(!s.contains("super_secret"));
+        assert!(s.contains("password"));
     }
 }

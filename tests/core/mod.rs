@@ -7,7 +7,6 @@ mod copy;
 mod derive;
 mod hstore;
 mod notify;
-mod observability;
 mod pipeline;
 mod pool;
 mod pool_callbacks;

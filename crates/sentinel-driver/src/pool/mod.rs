@@ -81,11 +81,16 @@ pub struct PoolMetrics {
 #[derive(Clone)]
 pub struct Pool {
     shared: Arc<PoolShared>,
+    pool_instrumentation: Arc<dyn crate::Instrumentation>,
 }
 
 impl Pool {
     /// Create a new connection pool. No connections are opened until `acquire()`.
     pub fn new(config: Config, pool_config: PoolConfig) -> Self {
+        let pool_instrumentation = config
+            .instrumentation
+            .clone()
+            .unwrap_or_else(crate::instrumentation::noop);
         let shared = Arc::new(PoolShared {
             semaphore: Semaphore::new(pool_config.max_connections),
             config,
@@ -96,7 +101,10 @@ impl Pool {
             }),
         });
 
-        Self { shared }
+        Self {
+            shared,
+            pool_instrumentation,
+        }
     }
 
     /// Create a pool that defers all connection establishment until the
@@ -118,12 +126,46 @@ impl Pool {
         Self::new(config, pool_config)
     }
 
+    /// Install an `Instrumentation` impl. Replaces whatever was inherited
+    /// from `Config::with_instrumentation`. Affects this `Pool` handle and
+    /// any `Pool::clone()` made after this call; existing clones keep the
+    /// previous instrumentation.
+    pub fn with_instrumentation(mut self, instr: Arc<dyn crate::Instrumentation>) -> Self {
+        self.pool_instrumentation = instr;
+        self
+    }
+
     /// Acquire a connection from the pool.
     ///
     /// If an idle connection is available, it's returned immediately.
     /// Otherwise, a new connection is created (up to `max_connections`).
     /// If the pool is full, waits up to `acquire_timeout`.
     pub async fn acquire(&self) -> Result<PooledConnection> {
+        let pending = {
+            let state = self.shared.state.lock().await;
+            state.total_count.saturating_sub(state.idle.len())
+        };
+        self.pool_instrumentation
+            .on_event(&crate::Event::PoolAcquireStart { pending });
+        let started = std::time::Instant::now();
+        let res = self.acquire_inner().await;
+        let wait = started.elapsed();
+        let outcome = match &res {
+            Ok(_) => crate::AcquireOutcome::Ok,
+            Err(crate::Error::Pool(msg)) if msg.contains("timeout") => {
+                crate::AcquireOutcome::Timeout
+            }
+            Err(crate::Error::Pool(msg)) if msg.contains("closed") => {
+                crate::AcquireOutcome::PoolClosed
+            }
+            Err(_) => crate::AcquireOutcome::Error,
+        };
+        self.pool_instrumentation
+            .on_event(&crate::Event::PoolAcquireFinish { wait, outcome });
+        res
+    }
+
+    async fn acquire_inner(&self) -> Result<PooledConnection> {
         let permit = tokio::time::timeout(
             self.shared.pool_config.acquire_timeout,
             self.shared.semaphore.acquire(),
@@ -152,11 +194,7 @@ impl Pool {
                     debug!("idle connection failed health check, creating new one");
                     self.decrement_count().await;
                     let (conn, meta) = self.create_connection().await?;
-                    return Ok(PooledConnection {
-                        conn: Some(conn),
-                        meta,
-                        shared: Arc::clone(&self.shared),
-                    });
+                    return Ok(self.wrap(conn, meta));
                 }
 
                 // Run before_acquire callback
@@ -167,48 +205,28 @@ impl Pool {
                             debug!("before_acquire rejected connection");
                             self.decrement_count().await;
                             let (conn, meta) = self.create_connection().await?;
-                            return Ok(PooledConnection {
-                                conn: Some(conn),
-                                meta,
-                                shared: Arc::clone(&self.shared),
-                            });
+                            return Ok(self.wrap(conn, meta));
                         }
                         Err(_) => {
                             debug!("before_acquire callback error, discarding connection");
                             self.decrement_count().await;
                             let (conn, meta) = self.create_connection().await?;
-                            return Ok(PooledConnection {
-                                conn: Some(conn),
-                                meta,
-                                shared: Arc::clone(&self.shared),
-                            });
+                            return Ok(self.wrap(conn, meta));
                         }
                     }
                 }
 
                 debug!("reusing idle connection");
-                Ok(PooledConnection {
-                    conn: Some(conn),
-                    meta: idle.meta,
-                    shared: Arc::clone(&self.shared),
-                })
+                Ok(self.wrap(conn, idle.meta))
             } else {
                 debug!("idle connection expired, creating new one");
                 self.decrement_count().await;
                 let (conn, meta) = self.create_connection().await?;
-                Ok(PooledConnection {
-                    conn: Some(conn),
-                    meta,
-                    shared: Arc::clone(&self.shared),
-                })
+                Ok(self.wrap(conn, meta))
             }
         } else {
             let (conn, meta) = self.create_connection().await?;
-            Ok(PooledConnection {
-                conn: Some(conn),
-                meta,
-                shared: Arc::clone(&self.shared),
-            })
+            Ok(self.wrap(conn, meta))
         }
     }
 
@@ -241,6 +259,19 @@ impl Pool {
     }
 
     // ── Internal ─────────────────────────────────────
+
+    /// Wrap a freshly-acquired `Connection` into a `PooledConnection`,
+    /// propagating the pool's instrumentation to the connection before
+    /// returning it to the caller.
+    fn wrap(&self, mut conn: Connection, meta: ConnectionMeta) -> PooledConnection {
+        conn.set_instrumentation(self.pool_instrumentation.clone());
+        PooledConnection {
+            conn: Some(conn),
+            meta,
+            shared: Arc::clone(&self.shared),
+            pool_instrumentation: self.pool_instrumentation.clone(),
+        }
+    }
 
     async fn create_connection(&self) -> Result<(Connection, ConnectionMeta)> {
         let mut conn = Connection::connect(self.shared.config.clone()).await?;
@@ -297,6 +328,7 @@ pub struct PooledConnection {
     conn: Option<Connection>,
     meta: ConnectionMeta,
     shared: Arc<PoolShared>,
+    pool_instrumentation: Arc<dyn crate::Instrumentation>,
 }
 
 impl PooledConnection {
@@ -330,6 +362,10 @@ impl DerefMut for PooledConnection {
 impl Drop for PooledConnection {
     fn drop(&mut self) {
         if let Some(conn) = self.conn.take() {
+            // Emit PoolRelease synchronously; the rest happens async.
+            self.pool_instrumentation
+                .on_event(&crate::Event::PoolRelease);
+
             let shared = Arc::clone(&self.shared);
 
             if self.meta.is_broken {
