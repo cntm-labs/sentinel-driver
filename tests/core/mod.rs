@@ -9,6 +9,7 @@ mod hstore;
 mod notify;
 mod pipeline;
 mod pool;
+mod pool_as_client;
 mod pool_callbacks;
 mod portal;
 mod protocol;

@@ -66,7 +66,7 @@ pub use connection::Connection;
 pub use copy::binary::{BinaryCopyDecoder, BinaryCopyEncoder};
 pub use copy::text::{TextCopyDecoder, TextCopyEncoder};
 pub use error::{Error, Result};
-pub use generic_client::GenericClient;
+pub use generic_client::{AsPool, GenericClient};
 pub use instrumentation::{
     AcquireOutcome, DisconnectReason, Event, Instrumentation, Outcome, RollbackReason, StmtRef,
 };
