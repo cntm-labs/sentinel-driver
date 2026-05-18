@@ -134,6 +134,145 @@ impl GenericClient for Connection {
     }
 }
 
+/// Types from which a `Connection` can be borrowed for the duration of one
+/// closure. The blanket `impl GenericClient for &P` builds on this.
+///
+/// Implemented on `Pool` and re-implementable by user wrappers (e.g. a
+/// load-balanced multi-pool router).
+pub trait AsPool {
+    /// Acquire a connection, run `f` on it, release on drop.
+    fn with_conn<'a, R, F>(
+        &'a self,
+        f: F,
+    ) -> impl std::future::Future<Output = Result<R>> + Send + 'a
+    where
+        F: FnOnce(&'a mut Connection) -> futures_core::future::BoxFuture<'a, Result<R>>
+            + Send
+            + 'a,
+        R: Send + 'a;
+}
+
+impl<P> GenericClient for &P
+where
+    P: AsPool + Sync,
+{
+    async fn query(&mut self, sql: &str, params: &[&(dyn ToSql + Sync)]) -> Result<Vec<Row>> {
+        let sql = sql.to_owned();
+        let params_vec: Vec<&(dyn ToSql + Sync)> = params.iter().copied().collect();
+        (**self)
+            .with_conn(move |c| {
+                Box::pin(async move { c.query(&sql, &params_vec).await })
+            })
+            .await
+    }
+
+    async fn query_one(&mut self, sql: &str, params: &[&(dyn ToSql + Sync)]) -> Result<Row> {
+        let sql = sql.to_owned();
+        let params_vec: Vec<&(dyn ToSql + Sync)> = params.iter().copied().collect();
+        (**self)
+            .with_conn(move |c| {
+                Box::pin(async move { c.query_one(&sql, &params_vec).await })
+            })
+            .await
+    }
+
+    async fn query_opt(
+        &mut self,
+        sql: &str,
+        params: &[&(dyn ToSql + Sync)],
+    ) -> Result<Option<Row>> {
+        let sql = sql.to_owned();
+        let params_vec: Vec<&(dyn ToSql + Sync)> = params.iter().copied().collect();
+        (**self)
+            .with_conn(move |c| {
+                Box::pin(async move { c.query_opt(&sql, &params_vec).await })
+            })
+            .await
+    }
+
+    async fn execute(&mut self, sql: &str, params: &[&(dyn ToSql + Sync)]) -> Result<u64> {
+        let sql = sql.to_owned();
+        let params_vec: Vec<&(dyn ToSql + Sync)> = params.iter().copied().collect();
+        (**self)
+            .with_conn(move |c| {
+                Box::pin(async move { c.execute(&sql, &params_vec).await })
+            })
+            .await
+    }
+
+    async fn simple_query(&mut self, sql: &str) -> Result<Vec<crate::row::SimpleQueryMessage>> {
+        let sql = sql.to_owned();
+        (**self)
+            .with_conn(move |c| Box::pin(async move { c.simple_query(&sql).await }))
+            .await
+    }
+
+    async fn query_typed(
+        &mut self,
+        sql: &str,
+        params: &[(&(dyn ToSql + Sync), crate::Oid)],
+    ) -> Result<Vec<Row>> {
+        let sql = sql.to_owned();
+        let params_vec: Vec<(&(dyn ToSql + Sync), crate::Oid)> = params.iter().copied().collect();
+        (**self)
+            .with_conn(move |c| {
+                Box::pin(async move { c.query_typed(&sql, &params_vec).await })
+            })
+            .await
+    }
+
+    async fn query_typed_one(
+        &mut self,
+        sql: &str,
+        params: &[(&(dyn ToSql + Sync), crate::Oid)],
+    ) -> Result<Row> {
+        let sql = sql.to_owned();
+        let params_vec: Vec<(&(dyn ToSql + Sync), crate::Oid)> = params.iter().copied().collect();
+        (**self)
+            .with_conn(move |c| {
+                Box::pin(async move { c.query_typed_one(&sql, &params_vec).await })
+            })
+            .await
+    }
+
+    async fn query_typed_opt(
+        &mut self,
+        sql: &str,
+        params: &[(&(dyn ToSql + Sync), crate::Oid)],
+    ) -> Result<Option<Row>> {
+        let sql = sql.to_owned();
+        let params_vec: Vec<(&(dyn ToSql + Sync), crate::Oid)> = params.iter().copied().collect();
+        (**self)
+            .with_conn(move |c| {
+                Box::pin(async move { c.query_typed_opt(&sql, &params_vec).await })
+            })
+            .await
+    }
+
+    async fn execute_typed(
+        &mut self,
+        sql: &str,
+        params: &[(&(dyn ToSql + Sync), crate::Oid)],
+    ) -> Result<u64> {
+        let sql = sql.to_owned();
+        let params_vec: Vec<(&(dyn ToSql + Sync), crate::Oid)> = params.iter().copied().collect();
+        (**self)
+            .with_conn(move |c| {
+                Box::pin(async move { c.execute_typed(&sql, &params_vec).await })
+            })
+            .await
+    }
+
+    async fn execute_pipeline(
+        &mut self,
+        batch: crate::pipeline::batch::PipelineBatch,
+    ) -> Result<Vec<crate::pipeline::QueryResult>> {
+        (**self)
+            .with_conn(move |c| Box::pin(async move { c.execute_pipeline(batch).await }))
+            .await
+    }
+}
+
 impl GenericClient for crate::PooledConnection {
     async fn query(&mut self, sql: &str, params: &[&(dyn ToSql + Sync)]) -> Result<Vec<Row>> {
         Connection::query(self, sql, params).await
