@@ -412,3 +412,102 @@ impl Drop for PooledConnection {
         }
     }
 }
+
+/// `GenericClient` for `&Pool` — acquire one connection, run the query,
+/// return it to the pool on drop.
+///
+/// This is a direct impl rather than going through `AsPool::with_conn`
+/// because the `'a`-fixed closure signature in `AsPool` cannot be satisfied
+/// for a locally-acquired `PooledConnection` in safe Rust (the borrow
+/// checker cannot prove the local outlives `'a` even though the async block
+/// that owns it is itself `'a`-bounded, and `unsafe_code` is forbidden
+/// workspace-wide).  The direct impl avoids that lifetime knot entirely.
+impl crate::generic_client::GenericClient for &Pool {
+    async fn query(
+        &mut self,
+        sql: &str,
+        params: &[&(dyn crate::types::ToSql + Sync)],
+    ) -> crate::Result<Vec<crate::row::Row>> {
+        let mut pooled = self.acquire().await?;
+        crate::Connection::query(&mut *pooled, sql, params).await
+    }
+
+    async fn query_one(
+        &mut self,
+        sql: &str,
+        params: &[&(dyn crate::types::ToSql + Sync)],
+    ) -> crate::Result<crate::row::Row> {
+        let mut pooled = self.acquire().await?;
+        crate::Connection::query_one(&mut *pooled, sql, params).await
+    }
+
+    async fn query_opt(
+        &mut self,
+        sql: &str,
+        params: &[&(dyn crate::types::ToSql + Sync)],
+    ) -> crate::Result<Option<crate::row::Row>> {
+        let mut pooled = self.acquire().await?;
+        crate::Connection::query_opt(&mut *pooled, sql, params).await
+    }
+
+    async fn execute(
+        &mut self,
+        sql: &str,
+        params: &[&(dyn crate::types::ToSql + Sync)],
+    ) -> crate::Result<u64> {
+        let mut pooled = self.acquire().await?;
+        crate::Connection::execute(&mut *pooled, sql, params).await
+    }
+
+    async fn simple_query(
+        &mut self,
+        sql: &str,
+    ) -> crate::Result<Vec<crate::row::SimpleQueryMessage>> {
+        let mut pooled = self.acquire().await?;
+        crate::Connection::simple_query(&mut *pooled, sql).await
+    }
+
+    async fn query_typed(
+        &mut self,
+        sql: &str,
+        params: &[(&(dyn crate::types::ToSql + Sync), crate::Oid)],
+    ) -> crate::Result<Vec<crate::row::Row>> {
+        let mut pooled = self.acquire().await?;
+        crate::Connection::query_typed(&mut *pooled, sql, params).await
+    }
+
+    async fn query_typed_one(
+        &mut self,
+        sql: &str,
+        params: &[(&(dyn crate::types::ToSql + Sync), crate::Oid)],
+    ) -> crate::Result<crate::row::Row> {
+        let mut pooled = self.acquire().await?;
+        crate::Connection::query_typed_one(&mut *pooled, sql, params).await
+    }
+
+    async fn query_typed_opt(
+        &mut self,
+        sql: &str,
+        params: &[(&(dyn crate::types::ToSql + Sync), crate::Oid)],
+    ) -> crate::Result<Option<crate::row::Row>> {
+        let mut pooled = self.acquire().await?;
+        crate::Connection::query_typed_opt(&mut *pooled, sql, params).await
+    }
+
+    async fn execute_typed(
+        &mut self,
+        sql: &str,
+        params: &[(&(dyn crate::types::ToSql + Sync), crate::Oid)],
+    ) -> crate::Result<u64> {
+        let mut pooled = self.acquire().await?;
+        crate::Connection::execute_typed(&mut *pooled, sql, params).await
+    }
+
+    async fn execute_pipeline(
+        &mut self,
+        batch: crate::pipeline::batch::PipelineBatch,
+    ) -> crate::Result<Vec<crate::pipeline::QueryResult>> {
+        let mut pooled = self.acquire().await?;
+        crate::Connection::execute_pipeline(&mut *pooled, batch).await
+    }
+}
