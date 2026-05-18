@@ -11,7 +11,9 @@ async fn make_pool() -> Option<Pool> {
 
 #[tokio::test]
 async fn pool_ref_query() {
-    let Some(pool) = make_pool().await else { return };
+    let Some(pool) = make_pool().await else {
+        return;
+    };
     let mut p = &pool; // bind so we have `&mut &Pool` for trait dispatch
     let rows = p.query("SELECT 1::int4 AS n", &[]).await.unwrap();
     assert_eq!(rows.len(), 1);
@@ -21,7 +23,9 @@ async fn pool_ref_query() {
 
 #[tokio::test]
 async fn pool_ref_query_one() {
-    let Some(pool) = make_pool().await else { return };
+    let Some(pool) = make_pool().await else {
+        return;
+    };
     let mut p = &pool;
     let row = p.query_one("SELECT 'hello'::text", &[]).await.unwrap();
     let s: String = row.try_get(0).unwrap();
@@ -30,7 +34,9 @@ async fn pool_ref_query_one() {
 
 #[tokio::test]
 async fn pool_ref_query_typed_one() {
-    let Some(pool) = make_pool().await else { return };
+    let Some(pool) = make_pool().await else {
+        return;
+    };
     let mut p = &pool;
     let row = p
         .query_typed_one(
@@ -48,7 +54,9 @@ async fn pool_ref_query_typed_one() {
 
 #[tokio::test]
 async fn pool_ref_execute() {
-    let Some(pool) = make_pool().await else { return };
+    let Some(pool) = make_pool().await else {
+        return;
+    };
     let mut p = &pool;
     let n = p.execute("SELECT 1", &[]).await.unwrap();
     // SELECT returns "affected rows" = 0 in PG's CommandComplete

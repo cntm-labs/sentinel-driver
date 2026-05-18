@@ -146,9 +146,7 @@ pub trait AsPool {
         f: F,
     ) -> impl std::future::Future<Output = Result<R>> + Send + 'a
     where
-        F: FnOnce(&'a mut Connection) -> futures_core::future::BoxFuture<'a, Result<R>>
-            + Send
-            + 'a,
+        F: FnOnce(&'a mut Connection) -> futures_core::future::BoxFuture<'a, Result<R>> + Send + 'a,
         R: Send + 'a;
 }
 
@@ -158,21 +156,17 @@ where
 {
     async fn query(&mut self, sql: &str, params: &[&(dyn ToSql + Sync)]) -> Result<Vec<Row>> {
         let sql = sql.to_owned();
-        let params_vec: Vec<&(dyn ToSql + Sync)> = params.iter().copied().collect();
+        let params_vec: Vec<&(dyn ToSql + Sync)> = params.to_vec();
         (**self)
-            .with_conn(move |c| {
-                Box::pin(async move { c.query(&sql, &params_vec).await })
-            })
+            .with_conn(move |c| Box::pin(async move { c.query(&sql, &params_vec).await }))
             .await
     }
 
     async fn query_one(&mut self, sql: &str, params: &[&(dyn ToSql + Sync)]) -> Result<Row> {
         let sql = sql.to_owned();
-        let params_vec: Vec<&(dyn ToSql + Sync)> = params.iter().copied().collect();
+        let params_vec: Vec<&(dyn ToSql + Sync)> = params.to_vec();
         (**self)
-            .with_conn(move |c| {
-                Box::pin(async move { c.query_one(&sql, &params_vec).await })
-            })
+            .with_conn(move |c| Box::pin(async move { c.query_one(&sql, &params_vec).await }))
             .await
     }
 
@@ -182,21 +176,17 @@ where
         params: &[&(dyn ToSql + Sync)],
     ) -> Result<Option<Row>> {
         let sql = sql.to_owned();
-        let params_vec: Vec<&(dyn ToSql + Sync)> = params.iter().copied().collect();
+        let params_vec: Vec<&(dyn ToSql + Sync)> = params.to_vec();
         (**self)
-            .with_conn(move |c| {
-                Box::pin(async move { c.query_opt(&sql, &params_vec).await })
-            })
+            .with_conn(move |c| Box::pin(async move { c.query_opt(&sql, &params_vec).await }))
             .await
     }
 
     async fn execute(&mut self, sql: &str, params: &[&(dyn ToSql + Sync)]) -> Result<u64> {
         let sql = sql.to_owned();
-        let params_vec: Vec<&(dyn ToSql + Sync)> = params.iter().copied().collect();
+        let params_vec: Vec<&(dyn ToSql + Sync)> = params.to_vec();
         (**self)
-            .with_conn(move |c| {
-                Box::pin(async move { c.execute(&sql, &params_vec).await })
-            })
+            .with_conn(move |c| Box::pin(async move { c.execute(&sql, &params_vec).await }))
             .await
     }
 
@@ -213,11 +203,9 @@ where
         params: &[(&(dyn ToSql + Sync), crate::Oid)],
     ) -> Result<Vec<Row>> {
         let sql = sql.to_owned();
-        let params_vec: Vec<(&(dyn ToSql + Sync), crate::Oid)> = params.iter().copied().collect();
+        let params_vec: Vec<(&(dyn ToSql + Sync), crate::Oid)> = params.to_vec();
         (**self)
-            .with_conn(move |c| {
-                Box::pin(async move { c.query_typed(&sql, &params_vec).await })
-            })
+            .with_conn(move |c| Box::pin(async move { c.query_typed(&sql, &params_vec).await }))
             .await
     }
 
@@ -227,11 +215,9 @@ where
         params: &[(&(dyn ToSql + Sync), crate::Oid)],
     ) -> Result<Row> {
         let sql = sql.to_owned();
-        let params_vec: Vec<(&(dyn ToSql + Sync), crate::Oid)> = params.iter().copied().collect();
+        let params_vec: Vec<(&(dyn ToSql + Sync), crate::Oid)> = params.to_vec();
         (**self)
-            .with_conn(move |c| {
-                Box::pin(async move { c.query_typed_one(&sql, &params_vec).await })
-            })
+            .with_conn(move |c| Box::pin(async move { c.query_typed_one(&sql, &params_vec).await }))
             .await
     }
 
@@ -241,11 +227,9 @@ where
         params: &[(&(dyn ToSql + Sync), crate::Oid)],
     ) -> Result<Option<Row>> {
         let sql = sql.to_owned();
-        let params_vec: Vec<(&(dyn ToSql + Sync), crate::Oid)> = params.iter().copied().collect();
+        let params_vec: Vec<(&(dyn ToSql + Sync), crate::Oid)> = params.to_vec();
         (**self)
-            .with_conn(move |c| {
-                Box::pin(async move { c.query_typed_opt(&sql, &params_vec).await })
-            })
+            .with_conn(move |c| Box::pin(async move { c.query_typed_opt(&sql, &params_vec).await }))
             .await
     }
 
@@ -255,11 +239,9 @@ where
         params: &[(&(dyn ToSql + Sync), crate::Oid)],
     ) -> Result<u64> {
         let sql = sql.to_owned();
-        let params_vec: Vec<(&(dyn ToSql + Sync), crate::Oid)> = params.iter().copied().collect();
+        let params_vec: Vec<(&(dyn ToSql + Sync), crate::Oid)> = params.to_vec();
         (**self)
-            .with_conn(move |c| {
-                Box::pin(async move { c.execute_typed(&sql, &params_vec).await })
-            })
+            .with_conn(move |c| Box::pin(async move { c.execute_typed(&sql, &params_vec).await }))
             .await
     }
 
