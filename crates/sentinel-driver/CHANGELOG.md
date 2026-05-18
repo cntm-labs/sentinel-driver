@@ -1,5 +1,16 @@
 # Changelog
 
+## [4.0.0](https://github.com/cntm-labs/sentinel-driver/compare/sentinel-driver-v3.0.0...sentinel-driver-v4.0.0) (2026-05-18)
+
+
+### ⚠ BREAKING CHANGES
+
+* **generic_client:** AsPool + Pool-as-first-class-arg (v4.0.0) ([#42](https://github.com/cntm-labs/sentinel-driver/issues/42))
+
+### Features
+
+* **generic_client:** AsPool + Pool-as-first-class-arg (v4.0.0) ([#42](https://github.com/cntm-labs/sentinel-driver/issues/42)) ([2b54331](https://github.com/cntm-labs/sentinel-driver/commit/2b543312e3181277718b8d35176a8c67ac4ca4c5))
+
 ## [3.0.0](https://github.com/cntm-labs/sentinel-driver/compare/sentinel-driver-v2.0.0...sentinel-driver-v3.0.0) (2026-05-16)
 
 
