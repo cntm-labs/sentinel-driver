@@ -33,6 +33,40 @@ pub trait GenericClient {
 
     /// Execute a simple query (text protocol, no parameters).
     async fn simple_query(&mut self, sql: &str) -> Result<Vec<SimpleQueryMessage>>;
+
+    /// Execute a typed query (skips the prepare round-trip).
+    async fn query_typed(
+        &mut self,
+        sql: &str,
+        params: &[(&(dyn ToSql + Sync), crate::Oid)],
+    ) -> Result<Vec<Row>>;
+
+    /// Execute a typed query that returns a single row.
+    async fn query_typed_one(
+        &mut self,
+        sql: &str,
+        params: &[(&(dyn ToSql + Sync), crate::Oid)],
+    ) -> Result<Row>;
+
+    /// Execute a typed query that returns an optional row.
+    async fn query_typed_opt(
+        &mut self,
+        sql: &str,
+        params: &[(&(dyn ToSql + Sync), crate::Oid)],
+    ) -> Result<Option<Row>>;
+
+    /// Execute a typed non-SELECT, returning rows affected.
+    async fn execute_typed(
+        &mut self,
+        sql: &str,
+        params: &[(&(dyn ToSql + Sync), crate::Oid)],
+    ) -> Result<u64>;
+
+    /// Run a pre-built `PipelineBatch` in one round-trip.
+    async fn execute_pipeline(
+        &mut self,
+        batch: crate::pipeline::batch::PipelineBatch,
+    ) -> Result<Vec<crate::pipeline::QueryResult>>;
 }
 
 impl GenericClient for Connection {
@@ -59,6 +93,45 @@ impl GenericClient for Connection {
     async fn simple_query(&mut self, sql: &str) -> Result<Vec<SimpleQueryMessage>> {
         Connection::simple_query(self, sql).await
     }
+
+    async fn query_typed(
+        &mut self,
+        sql: &str,
+        params: &[(&(dyn ToSql + Sync), crate::Oid)],
+    ) -> Result<Vec<Row>> {
+        Connection::query_typed(self, sql, params).await
+    }
+
+    async fn query_typed_one(
+        &mut self,
+        sql: &str,
+        params: &[(&(dyn ToSql + Sync), crate::Oid)],
+    ) -> Result<Row> {
+        Connection::query_typed_one(self, sql, params).await
+    }
+
+    async fn query_typed_opt(
+        &mut self,
+        sql: &str,
+        params: &[(&(dyn ToSql + Sync), crate::Oid)],
+    ) -> Result<Option<Row>> {
+        Connection::query_typed_opt(self, sql, params).await
+    }
+
+    async fn execute_typed(
+        &mut self,
+        sql: &str,
+        params: &[(&(dyn ToSql + Sync), crate::Oid)],
+    ) -> Result<u64> {
+        Connection::execute_typed(self, sql, params).await
+    }
+
+    async fn execute_pipeline(
+        &mut self,
+        batch: crate::pipeline::batch::PipelineBatch,
+    ) -> Result<Vec<crate::pipeline::QueryResult>> {
+        Connection::execute_pipeline(self, batch).await
+    }
 }
 
 impl GenericClient for crate::PooledConnection {
@@ -84,5 +157,44 @@ impl GenericClient for crate::PooledConnection {
 
     async fn simple_query(&mut self, sql: &str) -> Result<Vec<SimpleQueryMessage>> {
         Connection::simple_query(self, sql).await
+    }
+
+    async fn query_typed(
+        &mut self,
+        sql: &str,
+        params: &[(&(dyn ToSql + Sync), crate::Oid)],
+    ) -> Result<Vec<Row>> {
+        Connection::query_typed(self, sql, params).await
+    }
+
+    async fn query_typed_one(
+        &mut self,
+        sql: &str,
+        params: &[(&(dyn ToSql + Sync), crate::Oid)],
+    ) -> Result<Row> {
+        Connection::query_typed_one(self, sql, params).await
+    }
+
+    async fn query_typed_opt(
+        &mut self,
+        sql: &str,
+        params: &[(&(dyn ToSql + Sync), crate::Oid)],
+    ) -> Result<Option<Row>> {
+        Connection::query_typed_opt(self, sql, params).await
+    }
+
+    async fn execute_typed(
+        &mut self,
+        sql: &str,
+        params: &[(&(dyn ToSql + Sync), crate::Oid)],
+    ) -> Result<u64> {
+        Connection::execute_typed(self, sql, params).await
+    }
+
+    async fn execute_pipeline(
+        &mut self,
+        batch: crate::pipeline::batch::PipelineBatch,
+    ) -> Result<Vec<crate::pipeline::QueryResult>> {
+        Connection::execute_pipeline(self, batch).await
     }
 }
